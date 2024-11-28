@@ -1,5 +1,6 @@
 mod intro;
 mod overview;
+mod section;
 
 use crate::overview::Overview;
 use foliage::tree::EcsExtension;
