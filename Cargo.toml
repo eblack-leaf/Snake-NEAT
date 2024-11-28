@@ -1,0 +1,12 @@
+[package]
+name = "Snake-NEAT"
+version = "0.1.0"
+edition = "2021"
+
+[profile.test]
+debug = true
+
+[dependencies]
+rand = "0.8.5"
+foliage = { git="https://github.com/eblack-leaf/foliage.git" }
+neat = { git="https://github.com/eblack-leaf/NEAT.git" }
