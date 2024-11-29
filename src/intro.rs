@@ -8,7 +8,7 @@ use foliage::grid::aspect::stem;
 use foliage::grid::responsive::evaluate::ScrollContext;
 use foliage::grid::responsive::ResponsiveLocation;
 use foliage::grid::unit::TokenUnit;
-use foliage::leaf::{EvaluateCore, Leaf, Remove};
+use foliage::leaf::{EvaluateCore, Leaf};
 use foliage::opacity::Opacity;
 use foliage::text::{FontSize, Text};
 use foliage::tree::{EcsExtension, Tree};
@@ -64,11 +64,7 @@ pub(crate) fn intro_in(tree: &mut Tree, section_root: Entity) {
         .auto_height();
     let summary = tree
         .spawn(Leaf::new().stem(Some(desc)).opacity(0.0))
-        .insert(Text::new(
-            SUMMARY_TEXT,
-            FontSize::new(14),
-            Grey::plus_two(),
-        ))
+        .insert(Text::new(SUMMARY_TEXT, FontSize::new(14), Grey::plus_two()))
         .insert(ScrollContext::new(section_root))
         .insert(summary_location)
         .insert(EvaluateCore::recursive())
