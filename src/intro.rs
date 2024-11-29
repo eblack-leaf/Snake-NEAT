@@ -58,7 +58,7 @@ impl IntroIn {
                     FontSize::new(32),
                     Grey::plus_two(),
                 )
-                    .centered(),
+                .centered(),
             )
             .insert(ScrollContext::new(section_root))
             .insert(desc_location)
@@ -102,9 +102,7 @@ impl IntroIn {
     }
 }
 #[derive(Event)]
-pub(crate) struct IntroOut {
-
-}
+pub(crate) struct IntroOut {}
 impl IntroOut {
     pub(crate) fn obs(_trigger: Trigger<Self>, mut tree: Tree, intro_ids: Res<IntroIds>) {
         tree.entity(intro_ids.title).despawn();

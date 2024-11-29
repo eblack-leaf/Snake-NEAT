@@ -24,7 +24,7 @@ impl SectionIn {
             .unwrap();
         match trigger.event().id {
             0 => {
-                tree.trigger(IntroIn{ root: section_root })
+                tree.trigger(IntroIn { root: section_root });
             }
             _ => {}
         }
@@ -57,15 +57,11 @@ impl SectionOut {
             id: trigger.event().id,
         });
     }
-    pub(crate) fn end(
-        trigger: Trigger<OnEnd>,
-        mut tree: Tree,
-        query: Query<&OutSection>,
-    ) {
+    pub(crate) fn end(trigger: Trigger<OnEnd>, mut tree: Tree, query: Query<&OutSection>) {
         println!("out-section end");
         match query.get(trigger.entity()).copied().unwrap().id {
             0 => {
-                tree.trigger(IntroOut{});
+                tree.trigger(IntroOut {});
             }
             _ => {}
         }
@@ -99,17 +95,17 @@ impl SelectSection {
                         .targeting(id_table.section_buttons.get(current.id).copied().unwrap()),
                 );
             });
+            tree.start_sequence(|seq| {
+                seq.animate(
+                    Animation::new(OutlineWeight::new(SELECTOR_DIM))
+                        .start(0)
+                        .end(SECTION_OUT_END)
+                        .targeting(id_table.section_buttons.get(selected).copied().unwrap()),
+                );
+            });
+            tree.trigger(SectionIn { id: selected });
+            tree.insert_resource(CurrentSection { id: selected });
         }
-        tree.start_sequence(|seq| {
-            seq.animate(
-                Animation::new(OutlineWeight::new(SELECTOR_DIM))
-                    .start(0)
-                    .end(SECTION_OUT_END)
-                    .targeting(id_table.section_buttons.get(selected).copied().unwrap()),
-            );
-        });
-        tree.trigger(SectionIn { id: selected });
-        tree.insert_resource(CurrentSection { id: selected });
     }
 }
 pub(crate) struct SelectObs<const N: usize> {}

@@ -1,3 +1,4 @@
+use crate::intro::{IntroIn, IntroOut};
 use crate::section::{CurrentSection, SectionIn, SectionOut, SelectObs, SelectSection};
 use foliage::bevy_ecs::entity::Entity;
 use foliage::bevy_ecs::system::Resource;
@@ -15,7 +16,6 @@ use foliage::text::{FontSize, Text};
 use foliage::tree::Tree;
 use foliage::twig::{Branch, Twig};
 use foliage::{bevy_ecs, icon_handle};
-use crate::intro::{IntroIn, IntroOut};
 
 #[derive(Resource)]
 pub(crate) struct IdTable {
@@ -146,9 +146,6 @@ impl Branch for Overview {
                 7 => {
                     tree.entity(panel).observe(SelectObs::<7>::obs);
                 }
-                8 => {
-                    tree.entity(panel).observe(SelectObs::<8>::obs);
-                }
                 _ => {}
             };
             id_table.section_buttons.push(panel);
@@ -206,7 +203,7 @@ impl Branch for Overview {
         tree.observe(IntroIn::obs);
         tree.observe(IntroOut::obs);
         tree.insert_resource(id_table);
-        tree.insert_resource(CurrentSection::default());
+        tree.insert_resource(CurrentSection { id: 1});
         tree.trigger(SelectSection { id: 0 });
     }
 }
