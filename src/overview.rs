@@ -1,13 +1,16 @@
-use crate::section::{CurrentSection, SectionIn, SelectObs, SelectSection};
+use crate::section::{CurrentSection, SectionIn, SectionOut, SelectObs, SelectSection};
 use foliage::bevy_ecs::entity::Entity;
 use foliage::bevy_ecs::system::Resource;
 use foliage::color::{Grey, Monochromatic};
+use foliage::grid::aspect::{screen, stem};
 use foliage::grid::responsive::evaluate::{ScrollContext, Scrollable};
 use foliage::grid::responsive::ResponsiveLocation;
+use foliage::grid::unit::TokenUnit;
 use foliage::icon::{Icon, IconRequest};
 use foliage::interaction::ClickInteractionListener;
 use foliage::leaf::{EvaluateCore, Leaf};
 use foliage::panel::{Panel, Rounding};
+use foliage::shape::line::Line;
 use foliage::text::{FontSize, Text};
 use foliage::tree::Tree;
 use foliage::twig::{Branch, Twig};
@@ -45,6 +48,8 @@ pub(crate) const NUM_SECTIONS: usize = 8;
 pub(crate) const SELECTOR_DIM: u32 = 32;
 pub(crate) const SECTION_OUT_END: u64 = 300;
 pub(crate) const UNSELECTED_OUTLINE_WEIGHT: u32 = 3;
+pub(crate) const SIDE_PANEL_WIDTH: f32 = 200.0;
+pub(crate) const SECTION_HEADER_HEIGHT: f32 = 150.0;
 pub(crate) const SECTION_TITLES: [&'static str; NUM_SECTIONS] = [
     "Intro",
     "Network",
@@ -63,33 +68,52 @@ impl Branch for Overview {
             IconHandles::Check,
             include_bytes!("assets/check.icon").to_vec(),
         ));
-        let view_location = ResponsiveLocation::new();
+        let view_location = ResponsiveLocation::new()
+            .left(SIDE_PANEL_WIDTH.px())
+            .right(screen().right())
+            .top(screen().top())
+            .bottom(screen().bottom());
         let view_root = tree
             .spawn(Leaf::new().elevation(10))
             .insert(view_location)
-            .insert(Scrollable::new())
+            .insert(EvaluateCore::recursive())
             .id();
-        let side_panel_location = ResponsiveLocation::new();
+        let side_panel_location = ResponsiveLocation::new()
+            .left(screen().left())
+            .right(SIDE_PANEL_WIDTH.px())
+            .top(screen().top())
+            .bottom(screen().bottom());
         let side_panel_root = tree
             .spawn(Leaf::new().elevation(10))
             .insert(side_panel_location)
             .insert(Scrollable::new())
+            .insert(EvaluateCore::recursive())
             .id();
         let mut id_table = IdTable::new(view_root, side_panel_root);
         for i in 0..NUM_SECTIONS {
-            let section_location = ResponsiveLocation::new();
+            let section_location = ResponsiveLocation::new()
+                .left(stem().left())
+                .right(stem().right() - 8.px())
+                .top(stem().top() + 8.px())
+                .bottom(stem().bottom() - 8.px());
             let section_root = tree
-                .spawn(Leaf::new().elevation(0).opacity(0.0))
-                .insert(Panel::new(Rounding::all(0.2), Grey::minus_three()))
+                .spawn(Leaf::new().elevation(0).opacity(0.0).stem(Some(view_root)))
+                .insert(Panel::new(Rounding::all(0.025), Grey::minus_three()))
                 .insert(section_location)
+                .insert(Scrollable::new())
                 .insert(EvaluateCore::recursive())
                 .id();
             id_table.section_roots.push(section_root);
             let panel =
                 Panel::new(Rounding::all(1.0), Grey::plus_two()).outline(UNSELECTED_OUTLINE_WEIGHT);
-            let location = ResponsiveLocation::new();
+            let y = i as f32 * SECTION_HEADER_HEIGHT + 16.0;
+            let location = ResponsiveLocation::new()
+                .left((SELECTOR_DIM as i32).px())
+                .width((SELECTOR_DIM as i32).px())
+                .top(y.px())
+                .height((SELECTOR_DIM as i32).px());
             let panel = tree
-                .spawn(Leaf::new().elevation(0))
+                .spawn(Leaf::new().elevation(0).stem(Some(side_panel_root)))
                 .insert(panel)
                 .insert(location)
                 .insert(ScrollContext::new(side_panel_root))
@@ -128,24 +152,56 @@ impl Branch for Overview {
             };
             id_table.section_buttons.push(panel);
             let icon = Icon::new(IconHandles::Check, Grey::base());
-            let icon_location = ResponsiveLocation::new();
+            let next_layer_y = y + (SELECTOR_DIM as f32) + 8.0;
+            let icon_location = ResponsiveLocation::new()
+                .left(16.px())
+                .top(next_layer_y.px())
+                .width(24.px())
+                .height(24.px());
             let icon = tree
-                .spawn(Leaf::new().elevation(-1))
+                .spawn(Leaf::new().elevation(-1).stem(Some(side_panel_root)))
                 .insert(icon_location)
+                .insert(ScrollContext::new(side_panel_root))
                 .insert(icon)
                 .insert(EvaluateCore::recursive())
                 .id();
             id_table.section_icons.push(icon);
             let text = Text::new(SECTION_TITLES[i], FontSize::new(14), Grey::plus_two());
-            let text_location = ResponsiveLocation::new();
+            let text_location = ResponsiveLocation::new()
+                .left(56.px())
+                .width((SIDE_PANEL_WIDTH - 56.0).px())
+                .top(next_layer_y.px())
+                .auto_height();
             let text = tree
-                .spawn(Leaf::new().elevation(0))
+                .spawn(Leaf::new().elevation(0).stem(Some(side_panel_root)))
                 .insert(text)
+                .insert(ScrollContext::new(side_panel_root))
                 .insert(text_location)
                 .insert(EvaluateCore::recursive())
                 .id();
             id_table.section_titles.push(text);
+            if i + 1 != NUM_SECTIONS {
+                let line_x = SELECTOR_DIM as f32 * 1.5;
+                let other_y = (i + 1) as f32 * SECTION_HEADER_HEIGHT - (SELECTOR_DIM as f32 / 2f32);
+                let line_location = ResponsiveLocation::points()
+                    .point_ax(line_x.px())
+                    .point_ay((next_layer_y + 40.0).px())
+                    .point_bx(line_x.px())
+                    .point_by(other_y.px());
+                let line = Line::new(UNSELECTED_OUTLINE_WEIGHT as i32, Grey::plus_two());
+                let line = tree
+                    .spawn(Leaf::new().elevation(0).stem(Some(side_panel_root)))
+                    .insert(line)
+                    .insert(line_location)
+                    .insert(ScrollContext::new(side_panel_root))
+                    .insert(EvaluateCore::recursive())
+                    .id();
+                id_table.section_lines.push(line);
+            }
         }
+        tree.observe(SelectSection::obs);
+        tree.observe(SectionIn::obs);
+        tree.observe(SectionOut::obs);
         tree.insert_resource(id_table);
         tree.insert_resource(CurrentSection::default());
         tree.trigger(SelectSection { id: 0 });

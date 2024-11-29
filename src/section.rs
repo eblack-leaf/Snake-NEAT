@@ -52,6 +52,7 @@ impl SectionOut {
             seq.animate(animation.clone().targeting(section_root));
             seq.on_end(Self::end);
         });
+        println!("out-section {}", trigger.event().id);
         tree.entity(seq).insert(OutSection {
             id: trigger.event().id,
         });
@@ -62,6 +63,7 @@ impl SectionOut {
         mut tree: Tree,
         query: Query<&OutSection>,
     ) {
+        println!("out-section end");
         match query.get(trigger.entity()).copied().unwrap().id {
             0 => {
                 intro_out(&mut tree, &intro_ids);
@@ -86,7 +88,9 @@ impl SelectSection {
         current: Res<CurrentSection>,
     ) {
         let selected = trigger.event().id;
+        println!("select-section {}", selected);
         if current.id != selected {
+            println!("section-out for {}", current.id);
             tree.trigger(SectionOut { id: current.id });
             tree.start_sequence(|seq| {
                 seq.animate(
@@ -112,6 +116,7 @@ impl SelectSection {
 pub(crate) struct SelectObs<const N: usize> {}
 impl<const N: usize> SelectObs<N> {
     pub(crate) fn obs(_trigger: Trigger<OnClick>, mut tree: Tree) {
+        println!("selecting {}", N);
         tree.trigger(SelectSection { id: N });
     }
 }
