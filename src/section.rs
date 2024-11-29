@@ -1,4 +1,4 @@
-use crate::intro::{intro_in, intro_out, IntroIds};
+use crate::intro::{IntroIn, IntroOut};
 use crate::overview::{IdTable, SECTION_OUT_END, SELECTOR_DIM, UNSELECTED_OUTLINE_WEIGHT};
 use foliage::anim::Animation;
 use foliage::bevy_ecs;
@@ -24,7 +24,7 @@ impl SectionIn {
             .unwrap();
         match trigger.event().id {
             0 => {
-                intro_in(&mut tree, section_root);
+                tree.trigger(IntroIn{ root: section_root })
             }
             _ => {}
         }
@@ -59,14 +59,13 @@ impl SectionOut {
     }
     pub(crate) fn end(
         trigger: Trigger<OnEnd>,
-        intro_ids: Res<IntroIds>,
         mut tree: Tree,
         query: Query<&OutSection>,
     ) {
         println!("out-section end");
         match query.get(trigger.entity()).copied().unwrap().id {
             0 => {
-                intro_out(&mut tree, &intro_ids);
+                tree.trigger(IntroOut{});
             }
             _ => {}
         }

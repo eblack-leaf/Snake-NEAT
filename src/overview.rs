@@ -15,6 +15,7 @@ use foliage::text::{FontSize, Text};
 use foliage::tree::Tree;
 use foliage::twig::{Branch, Twig};
 use foliage::{bevy_ecs, icon_handle};
+use crate::intro::{IntroIn, IntroOut};
 
 #[derive(Resource)]
 pub(crate) struct IdTable {
@@ -202,6 +203,8 @@ impl Branch for Overview {
         tree.observe(SelectSection::obs);
         tree.observe(SectionIn::obs);
         tree.observe(SectionOut::obs);
+        tree.observe(IntroIn::obs);
+        tree.observe(IntroOut::obs);
         tree.insert_resource(id_table);
         tree.insert_resource(CurrentSection::default());
         tree.trigger(SelectSection { id: 0 });
