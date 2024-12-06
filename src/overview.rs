@@ -203,7 +203,7 @@ impl Branch for Overview {
         tree.observe(IntroIn::obs);
         tree.observe(IntroOut::obs);
         tree.insert_resource(id_table);
-        tree.insert_resource(CurrentSection { id: 1});
+        tree.insert_resource(CurrentSection { id: 1 });
         tree.trigger(SelectSection { id: 0 });
     }
 }

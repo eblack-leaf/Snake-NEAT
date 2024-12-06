@@ -9,4 +9,3 @@ debug = true
 [dependencies]
 rand = "0.8.5"
 foliage = { git="https://github.com/eblack-leaf/foliage.git" }
-neat = { git="https://github.com/eblack-leaf/NEAT.git" }
