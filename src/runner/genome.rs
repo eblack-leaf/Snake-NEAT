@@ -4,30 +4,22 @@ use crate::runner::node::{Node, NodeType};
 use crate::runner::{Depth, Fitness, GenomeId, NodeId, SpeciesId};
 use foliage::bevy_ecs;
 use foliage::bevy_ecs::component::Component;
-use foliage::bevy_ecs::entity::Entity;
 use foliage::bevy_ecs::event::Event;
 use foliage::bevy_ecs::prelude::{Query, Res, Trigger};
 use foliage::tree::Tree;
 use rand::Rng;
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct Genome {
     pub(crate) id: GenomeId,
     pub(crate) nodes: Vec<Node>,
     pub(crate) connections: Vec<Connection>,
     pub(crate) depth: Depth,
-    pub(crate) fitness: Fitness,
     pub(crate) species: SpeciesId,
     pub(crate) node_id_gen: NodeId,
 }
 impl Genome {
-    pub(crate) fn new(
-        tree: &mut Tree,
-        id: GenomeId,
-        this: Entity,
-        input_size: usize,
-        output_size: usize,
-    ) -> Self {
+    pub(crate) fn new(id: GenomeId, input_size: usize, output_size: usize) -> Self {
         // setup nodes + connections
         if input_size <= 0 || output_size <= 0 {
             panic!("Genome has no input/output dimensions");
@@ -63,7 +55,6 @@ impl Genome {
             nodes,
             connections,
             depth: 1,
-            fitness: 0.0,
             species: 0,
             node_id_gen,
         }
@@ -131,6 +122,51 @@ impl Activations {
     pub(crate) fn new(size: usize) -> Self {
         Self {
             values: vec![0.0; size],
+        }
+    }
+}
+#[derive(Event)]
+pub(crate) struct MaxDepthCheck {}
+impl MaxDepthCheck {
+    pub(crate) fn depth(genome: &Genome, count: i32, to: usize) -> (i32, bool) {
+        let mut max = count;
+        if count > 100 {
+            // println!("aborting depth @ {}", count);
+            return (10, true);
+        }
+        for c in genome.connections.iter() {
+            if c.to == to {
+                // println!("incoming-connection from: {} to: {}", c.from, c.to);
+                let (current, aborted) = Self::depth(genome, count + 1, c.from);
+                if aborted {
+                    return (current, true);
+                }
+                if current > max {
+                    max = current;
+                }
+            }
+        }
+        // println!("max {}", max);
+        (max, false)
+    }
+    pub(crate) fn obs(
+        trigger: Trigger<Self>,
+        mut tree: Tree,
+        mut genomes: Query<&mut Genome>,
+        environment: Res<Environment>,
+    ) {
+        for mut genome in genomes.iter_mut() {
+            let mut max = 0;
+            for o in environment.input_size..(environment.input_size + environment.output_size) {
+                let (current, aborted) = Self::depth(&genome, 0, o);
+                if aborted {
+                    genome.depth = 10;
+                }
+                if current > max {
+                    max = current;
+                }
+            }
+            genome.depth = max;
         }
     }
 }

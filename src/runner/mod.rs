@@ -1,5 +1,5 @@
 use crate::runner::game::{Game, Running};
-use crate::runner::genome::{Evaluation, NetworkInput, NetworkOutput, Reward};
+use crate::runner::genome::{Evaluation, MaxDepthCheck, NetworkInput, NetworkOutput, Reward};
 use crate::runner::species::{Speciate, Species};
 use environment::Environment;
 use foliage::bevy_ecs;
@@ -57,6 +57,7 @@ impl RunnerIn {
         environment.compatibility_factors.c2 = 1.0;
         environment.compatibility_factors.c3 = 0.5;
         environment.compatibility_threshold = 3.0;
+        environment.stagnation_threshold = 15;
         let root = tree
             .spawn(Leaf::new().stem(Some(trigger.event().root)))
             .id();
@@ -114,9 +115,7 @@ impl RunnerIn {
                 genome: g,
             });
             let genome = Genome::new(
-                &mut tree,
                 runner.genome_id_gen,
-                g,
                 environment.input_size,
                 environment.output_size,
             );
@@ -141,6 +140,10 @@ impl RunnerIn {
             runner.population.push(g);
             runner.genome_id_gen += 1;
         }
+        runner.best.replace((
+            Genome::new(0, environment.input_size, environment.output_size),
+            Evaluation::default(),
+        ));
         tree.insert_resource(runner);
         tree.insert_resource(environment);
         let ids = RunnerIds {
@@ -172,6 +175,7 @@ impl RunnerOut {
         runner: Res<Runner>,
     ) {
         // despawn all ids
+        tree.entity(ids.root).despawn();
     }
 }
 pub(crate) type NodeId = usize;
@@ -189,7 +193,7 @@ pub(crate) struct Runner {
     pub(crate) generation: Generation,
     pub(crate) requested_generation: Generation,
     pub(crate) run_to: bool,
-    pub(crate) best: Option<Entity>,
+    pub(crate) best: Option<(Genome, Evaluation)>,
     pub(crate) species_id_gen: SpeciesId,
     pub(crate) genome_id_gen: GenomeId,
     pub(crate) innovation: ExistingInnovation,
@@ -285,12 +289,84 @@ impl EvaluateGenome {
 #[derive(Event)]
 pub(crate) struct Process {}
 impl Process {
-    pub(crate) fn obs(trigger: Trigger<Self>, mut tree: Tree, runner: ResMut<Runner>) {
+    pub(crate) fn obs(
+        trigger: Trigger<Self>,
+        mut tree: Tree,
+        mut runner: ResMut<Runner>,
+        evaluations: Query<(Entity, &Evaluation)>,
+        environment: Res<Environment>,
+        genomes: Query<&Genome>,
+    ) {
         // species %
+        let mut to_cull = vec![];
+        let gen = runner.generation;
+        for species in runner.species.iter_mut() {
+            let max = species
+                .members
+                .iter()
+                .map(|e| evaluations.get(*e).unwrap().1.fitness)
+                .max_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap_or_default();
+            if max > species.max_fitness {
+                species.max_fitness = max;
+                species.last_improved = gen;
+            }
+
+            if gen > species.last_improved + environment.stagnation_threshold {
+                to_cull.push(species.id);
+            }
+        }
         // cull
+        for id in to_cull.iter_mut() {
+            *id = runner.species.iter().position(|s| s.id == *id).unwrap();
+        }
+        to_cull.sort();
+        to_cull.reverse();
+        for idx in to_cull {
+            if runner.species.len() == 1 {
+                // replace all with starting genomes
+                // put all into starting species
+                // for now continuing
+                continue;
+            }
+            runner.species.remove(idx);
+        }
+        let min_fitness = evaluations
+            .iter()
+            .map(|a| (a.0, *a.1))
+            .min_by(|a, b| a.1.fitness.partial_cmp(&b.1.fitness).unwrap())
+            .unwrap()
+            .1
+            .fitness;
+        let current_best = evaluations
+            .iter()
+            .map(|a| (a.0, *a.1))
+            .max_by(|a, b| a.1.fitness.partial_cmp(&b.1.fitness).unwrap())
+            .unwrap();
+        if current_best.1.fitness > runner.best.as_ref().unwrap().1.fitness {
+            runner
+                .best
+                .replace((genomes.get(current_best.0).unwrap().clone(), current_best.1));
+        }
+        let fitness_range = (current_best.1.fitness - min_fitness).max(1.0);
+        for species in runner.species.iter_mut() {
+            species.shared_fitness = 0.0;
+            if species.members.is_empty() {
+                continue;
+            }
+            for e in species.members.iter() {
+                let eval = *evaluations.get(*e).unwrap().1;
+                species.shared_fitness += eval.fitness;
+            }
+            if species.shared_fitness <= 0.0 {
+                continue;
+            }
+            species.shared_fitness /= species.members.len() as f32;
+        }
         // num_offspring
         // mutate & crossover (into runner.next_gen)
         // max-depth
+        tree.trigger(MaxDepthCheck {});
         // speciate
         tree.trigger(Speciate {});
     }

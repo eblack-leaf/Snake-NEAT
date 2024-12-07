@@ -1,6 +1,8 @@
 use crate::runner::compatibility::CompatibilityFactors;
+use crate::runner::Generation;
 use foliage::bevy_ecs;
 use foliage::bevy_ecs::prelude::Resource;
+
 #[derive(Resource)]
 pub(crate) struct Environment {
     pub(crate) population_count: i32,
@@ -8,6 +10,7 @@ pub(crate) struct Environment {
     pub(crate) output_size: usize,
     pub(crate) compatibility_factors: CompatibilityFactors,
     pub(crate) compatibility_threshold: f32,
+    pub(crate) stagnation_threshold: Generation,
     // other configurations
 }
 
@@ -23,6 +26,7 @@ impl Environment {
                 c3: 0.0,
             },
             compatibility_threshold: 0.0,
+            stagnation_threshold: 0,
         }
     }
 }
