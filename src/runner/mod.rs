@@ -48,7 +48,7 @@ pub(crate) struct RunnerIds {
     pub(crate) expanded_view: Entity,
 }
 impl RunnerIn {
-    pub(crate) fn obs(trigger: Trigger<Self>, mut tree: Tree, environment: Res<Environment>) {
+    pub(crate) fn obs(trigger: Trigger<Self>, mut tree: Tree) {
         let mut environment = Environment::new();
         environment.population_count = 150;
         environment.input_size = 6;
