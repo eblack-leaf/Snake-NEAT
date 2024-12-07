@@ -15,6 +15,7 @@ use foliage::tree::Tree;
 use game::GameSpeed;
 use genome::Genome;
 use innovation::ExistingInnovation;
+use rand::Rng;
 
 mod compatibility;
 mod connection;
@@ -90,7 +91,6 @@ impl RunnerIn {
         tree.insert_resource(GameSpeed::new(1));
         let mut runner = Runner {
             population: vec![],
-            next_gen: vec![],
             species: vec![],
             generation: 0,
             requested_generation: 1,
@@ -98,7 +98,6 @@ impl RunnerIn {
             best: None,
             species_id_gen: 0,
             genome_id_gen: 0,
-            innovation: ExistingInnovation::new(environment.input_size, environment.output_size),
         };
         let game_grid = (60, 30);
         let reward = Reward::new(5.0, 1.75, 0.75);
@@ -144,6 +143,10 @@ impl RunnerIn {
             Genome::new(0, environment.input_size, environment.output_size),
             Evaluation::default(),
         ));
+        tree.insert_resource(ExistingInnovation::new(
+            environment.input_size,
+            environment.output_size,
+        ));
         tree.insert_resource(runner);
         tree.insert_resource(environment);
         let ids = RunnerIds {
@@ -188,7 +191,6 @@ pub(crate) type Fitness = f32;
 #[derive(Resource)]
 pub(crate) struct Runner {
     pub(crate) population: Vec<Entity>,
-    pub(crate) next_gen: Vec<Genome>,
     pub(crate) species: Vec<Species>,
     pub(crate) generation: Generation,
     pub(crate) requested_generation: Generation,
@@ -196,7 +198,6 @@ pub(crate) struct Runner {
     pub(crate) best: Option<(Genome, Evaluation)>,
     pub(crate) species_id_gen: SpeciesId,
     pub(crate) genome_id_gen: GenomeId,
-    pub(crate) innovation: ExistingInnovation,
 }
 #[derive(Component, Copy, Clone)]
 pub(crate) struct GenomeView {
@@ -260,7 +261,7 @@ impl SelectGenome {
     ) {
         let view = trigger.entity();
         let genome = genome_views.get(view).unwrap().genome;
-        // copy genome to expanded-view.genome (deep copy not just clone component)
+        // copy genome to expanded-view.genome
     }
 }
 #[derive(Event)]
@@ -293,6 +294,7 @@ impl Process {
         trigger: Trigger<Self>,
         mut tree: Tree,
         mut runner: ResMut<Runner>,
+        mut existing_innovation: ResMut<ExistingInnovation>,
         evaluations: Query<(Entity, &Evaluation)>,
         environment: Res<Environment>,
         genomes: Query<&Genome>,
@@ -363,8 +365,90 @@ impl Process {
             }
             species.shared_fitness /= species.members.len() as f32;
         }
-        // num_offspring
-        // mutate & crossover (into runner.next_gen)
+        let total_fitness = runner.species.iter().map(|s| s.shared_fitness).sum::<f32>();
+        for species in runner.species.iter_mut() {
+            species.percent_total = species.shared_fitness / total_fitness;
+        }
+        let mut next_gen = vec![];
+        let mut remaining = environment.population_count as usize;
+        let mut next_gen_id = 0;
+        for species in runner.species.iter_mut() {
+            let mut offspring_count =
+                (species.percent_total * environment.population_count as f32).floor();
+            remaining -= offspring_count as usize;
+            if remaining <= 0 {
+                offspring_count += remaining as f32;
+            }
+            let only_mutate = (offspring_count * environment.only_mutate).floor();
+            let to_crossover = offspring_count - only_mutate;
+            let mut members = species
+                .members
+                .iter()
+                .map(|m| evaluations.get(*m).unwrap())
+                .map(|e| (e.0, *e.1))
+                .collect::<Vec<_>>();
+            members.sort_by(|a, b| a.1.fitness.partial_cmp(&b.1.fitness).unwrap());
+            members.reverse();
+            let elite_bound = ((environment.elitism * members.len() as f32) as usize)
+                .min(members.len())
+                .max(1);
+            let elites = members.get(0..elite_bound).unwrap().to_vec();
+            for _om in 0..only_mutate as usize {
+                let selected = elites
+                    .get(rand::thread_rng().gen_range(0..elites.len()))
+                    .copied()
+                    .unwrap();
+                let mut mutated = environment.mutate(
+                    genomes.get(selected.0).unwrap().clone(),
+                    &mut existing_innovation,
+                );
+                mutated.id = next_gen_id;
+                next_gen_id += 1;
+                next_gen.push(mutated);
+            }
+            for _c in 0..to_crossover as usize {
+                let parent1 = elites
+                    .get(rand::thread_rng().gen_range(0..elites.len()))
+                    .cloned()
+                    .unwrap();
+                let parent1_genome = genomes.get(parent1.0).unwrap().clone();
+                let mut parent2 = elites
+                    .get(rand::thread_rng().gen_range(0..elites.len()))
+                    .cloned()
+                    .unwrap();
+                let mut parent2_genome = genomes.get(parent2.0).unwrap().clone();
+                while parent1_genome.id == parent2_genome.id && elites.len() > 1 {
+                    parent2 = elites
+                        .get(rand::thread_rng().gen_range(0..elites.len()))
+                        .cloned()
+                        .unwrap();
+                    parent2_genome = genomes.get(parent2.0).cloned().unwrap();
+                }
+                let (best, other) = if parent1.1.fitness > parent2.1.fitness {
+                    (parent1_genome, parent2_genome)
+                } else if parent2.1.fitness > parent1.1.fitness {
+                    (parent2_genome, parent1_genome)
+                } else {
+                    if rand::thread_rng().gen_range(0.0..1.0) < 0.5 {
+                        (parent2_genome, parent1_genome)
+                    } else {
+                        (parent1_genome, parent2_genome)
+                    }
+                };
+                let crossover = environment.crossover(next_gen_id, best, other);
+                next_gen_id += 1;
+                let crossover =
+                    if rand::thread_rng().gen_range(0.0..1.0) < environment.crossover_only {
+                        crossover
+                    } else {
+                        environment.mutate(crossover, &mut existing_innovation)
+                    };
+                next_gen.push(crossover);
+            }
+        }
+        for (i, next) in next_gen.drain(..).enumerate() {
+            tree.entity(*runner.population.get(i).unwrap()).insert(next);
+        }
         // max-depth
         tree.trigger(MaxDepthCheck {});
         // speciate

@@ -1,6 +1,8 @@
 use crate::runner::{Innovation, NodeId};
+use foliage::bevy_ecs;
+use foliage::bevy_ecs::prelude::Resource;
 use std::collections::HashMap;
-
+#[derive(Resource)]
 pub(crate) struct ExistingInnovation {
     pub(crate) existing: HashMap<(NodeId, NodeId), Innovation>,
     pub(crate) generator: Innovation,
