@@ -70,6 +70,18 @@ pub(crate) struct Reward {
     pub(crate) can_move_towards_food_reward: Fitness,
 }
 impl Reward {
+    pub(crate) fn value(&self) -> f32 {
+        let conditional = if !self.moved_towards_food && self.can_move_towards_food {
+            -1.0
+        } else if !self.can_move_towards_food && !self.moved_towards_food {
+            1.0
+        } else {
+            0.0
+        };
+        f32::from(self.collected_food) * self.food_collection_reward
+            + f32::from(self.moved_towards_food) * self.towards_food_reward
+            + self.can_move_towards_food_reward * conditional
+    }
     pub(crate) fn new(fc: Fitness, tf: Fitness, cmtf: Fitness) -> Self {
         Self {
             can_move_towards_food: false,
@@ -131,12 +143,10 @@ impl MaxDepthCheck {
     pub(crate) fn depth(genome: &Genome, count: i32, to: usize) -> (i32, bool) {
         let mut max = count;
         if count > 100 {
-            // println!("aborting depth @ {}", count);
             return (10, true);
         }
         for c in genome.connections.iter() {
             if c.to == to {
-                // println!("incoming-connection from: {} to: {}", c.from, c.to);
                 let (current, aborted) = Self::depth(genome, count + 1, c.from);
                 if aborted {
                     return (current, true);
@@ -146,12 +156,10 @@ impl MaxDepthCheck {
                 }
             }
         }
-        // println!("max {}", max);
         (max, false)
     }
     pub(crate) fn obs(
         trigger: Trigger<Self>,
-        mut tree: Tree,
         mut genomes: Query<&mut Genome>,
         environment: Res<Environment>,
     ) {

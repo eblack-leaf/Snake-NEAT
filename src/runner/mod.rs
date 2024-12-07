@@ -67,6 +67,7 @@ impl RunnerIn {
         environment.crossover_only = 0.2;
         environment.connection_weight = 0.8;
         environment.perturb = 0.9;
+        environment.max_turns = 500;
         let root = tree
             .spawn(Leaf::new().stem(Some(trigger.event().root)))
             .id();
@@ -106,6 +107,7 @@ impl RunnerIn {
             best: None,
             species_id_gen: 0,
             genome_id_gen: 0,
+            finished: environment.population_count,
         };
         let game_grid = (60, 30);
         let reward = Reward::new(5.0, 1.75, 0.75);
@@ -130,13 +132,7 @@ impl RunnerIn {
             let snake = tree.spawn(Leaf::new().stem(Some(g))).id();
             let food = tree.spawn(Leaf::new().stem(Some(g))).id();
             let canvas = tree.spawn(Leaf::new().stem(Some(g))).id();
-            let game = Game {
-                snake,
-                food,
-                canvas,
-                grid: game_grid,
-                updated: false,
-            };
+            let game = Game::new(&mut tree, snake, food, canvas, game_grid);
             tree.entity(g)
                 .insert(game)
                 .insert(Running(false))
@@ -206,6 +202,7 @@ pub(crate) struct Runner {
     pub(crate) best: Option<(Genome, Evaluation)>,
     pub(crate) species_id_gen: SpeciesId,
     pub(crate) genome_id_gen: GenomeId,
+    pub(crate) finished: i32,
 }
 #[derive(Component, Copy, Clone)]
 pub(crate) struct GenomeView {
@@ -285,7 +282,7 @@ impl Evaluate {
 #[derive(Event)]
 pub(crate) struct EvaluateGenome {}
 impl EvaluateGenome {
-    pub(crate) fn obs(trigger: Trigger<Self>, mut tree: Tree) {
+    pub(crate) fn obs(trigger: Trigger<Self>, mut tree: Tree, mut runner: ResMut<Runner>) {
         let genome = trigger.entity();
         // reset score
         tree.entity(genome).insert(Evaluation::default());
@@ -293,6 +290,7 @@ impl EvaluateGenome {
         // reset food
         // start game
         tree.entity(genome).insert(Running(true));
+        runner.finished = (runner.finished - 1).max(0);
     }
 }
 #[derive(Event)]
@@ -457,9 +455,17 @@ impl Process {
         for (i, next) in next_gen.drain(..).enumerate() {
             tree.entity(*runner.population.get(i).unwrap()).insert(next);
         }
+        runner.generation += 1;
         // max-depth
         tree.trigger(MaxDepthCheck {});
         // speciate
         tree.trigger(Speciate {});
+        if runner.run_to {
+            if runner.generation < runner.requested_generation {
+                tree.trigger(Evaluate {});
+            } else {
+                runner.run_to = false;
+            }
+        }
     }
 }

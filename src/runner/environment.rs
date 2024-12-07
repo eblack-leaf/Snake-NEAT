@@ -24,6 +24,7 @@ pub(crate) struct Environment {
     pub(crate) connection_weight: f32,
     pub(crate) perturb: f32,
     pub(crate) add_node: f32,
+    pub(crate) max_turns: i32,
 }
 
 impl Environment {
@@ -47,6 +48,7 @@ impl Environment {
             connection_weight: 0.0,
             perturb: 0.0,
             add_node: 0.0,
+            max_turns: 0,
         }
     }
     pub(crate) fn mutate(
@@ -69,7 +71,6 @@ impl Environment {
                 return genome;
             }
             let new = Node::explicit(genome.node_id_gen, NodeType::Hidden);
-            // println!("adding node {}", new.id);
             genome.node_id_gen += 1;
             let idx = rand::thread_rng().gen_range(0..genome.connections.len());
             let existing_connection = genome.connections.get(idx).cloned().unwrap();
@@ -91,10 +92,6 @@ impl Environment {
             genome.nodes.push(new);
         } else if rand::thread_rng().gen_range(0.0..1.0) < self.add_connection {
             if let Some((input, output)) = self.select_connection_nodes(&genome) {
-                // println!(
-                //     "adding connection: from: {}:{:?} to: {}:{:?}",
-                //     input.id, input.ty, output.id, output.ty
-                // );
                 let connection = Connection::new(
                     input.id,
                     output.id,
@@ -185,10 +182,6 @@ impl Environment {
             .find(|c| c.from == input.id && c.to == output.id)
             .is_some()
         {
-            // recursive create_connection if can
-            // if potential_inputs.len() > 1 || potential_outputs.len() > 1 {
-            //     return self.select_connection_nodes(&genome);
-            // }
             return None;
         }
         Some((input, output))
