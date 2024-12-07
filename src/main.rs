@@ -17,6 +17,10 @@ fn main() {
     environment.population_count = 150;
     environment.input_size = 6;
     environment.output_size = 2;
+    environment.compatibility_factors.c1 = 1.0;
+    environment.compatibility_factors.c2 = 1.0;
+    environment.compatibility_factors.c3 = 0.5;
+    environment.compatibility_threshold = 3.0;
     foliage.ecs().insert_resource(environment);
     foliage.ecs().branch(Twig::new(Overview {}));
     foliage.photosynthesize();
