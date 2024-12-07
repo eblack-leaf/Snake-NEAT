@@ -21,6 +21,8 @@ impl Compatibility {
         }
     }
     pub(crate) fn distance(&self, factors: &CompatibilityFactors) -> f32 {
-        todo!()
+        factors.c1 * self.excess / self.n
+            + factors.c2 * self.disjoint / self.n
+            + factors.c3 * self.weight_difference
     }
 }

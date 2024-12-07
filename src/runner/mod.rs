@@ -86,7 +86,7 @@ impl RunnerIn {
         let game_speed_increment = tree
             .spawn(Leaf::new().stem(Some(game_speed)).elevation(0))
             .id();
-        tree.insert_resource(GameSpeed(1));
+        tree.insert_resource(GameSpeed::new(1));
         let mut runner = Runner {
             population: vec![],
             next_gen: vec![],
@@ -179,7 +179,6 @@ pub(crate) type GenomeId = usize;
 pub(crate) type SpeciesId = usize;
 pub(crate) type Generation = i32;
 pub(crate) type Innovation = i32;
-pub(crate) type Activation = f32;
 pub(crate) type Depth = i32;
 pub(crate) type Fitness = f32;
 #[derive(Resource)]
@@ -293,6 +292,6 @@ impl Process {
         // mutate & crossover (into runner.next_gen)
         // max-depth
         // speciate
-        tree.trigger(Speciate{});
+        tree.trigger(Speciate {});
     }
 }

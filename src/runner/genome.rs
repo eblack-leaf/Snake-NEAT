@@ -5,6 +5,7 @@ use crate::runner::{Depth, Fitness, GenomeId, NodeId, SpeciesId};
 use foliage::bevy_ecs;
 use foliage::bevy_ecs::component::Component;
 use foliage::bevy_ecs::entity::Entity;
+use foliage::bevy_ecs::event::Event;
 use foliage::bevy_ecs::prelude::{Query, Res, Trigger};
 use foliage::tree::Tree;
 use rand::Rng;
@@ -122,6 +123,18 @@ pub(crate) struct NetworkOutput {
     pub(crate) move_left: bool,
     pub(crate) move_right: bool,
 }
+#[derive(Component, Clone, Default)]
+pub(crate) struct Activations {
+    pub(crate) values: Vec<f32>,
+}
+impl Activations {
+    pub(crate) fn new(size: usize) -> Self {
+        Self {
+            values: vec![0.0; size],
+        }
+    }
+}
+#[derive(Event)]
 pub(crate) struct Activate {}
 impl Activate {
     pub(crate) const ACTIVATION_SCALE: f32 = 4.9;
@@ -133,6 +146,7 @@ impl Activate {
         mut tree: Tree,
         inputs: Query<&NetworkInput>,
         mut outputs: Query<&mut NetworkOutput>,
+        mut storage: Query<&mut Activations>,
         genomes: Query<&Genome>,
         environment: Res<Environment>,
     ) {
@@ -141,7 +155,7 @@ impl Activate {
         let mut summations = vec![0.0; genome.nodes.len()];
         let mut activations = vec![0.0; genome.nodes.len()];
         for _relax in 0..genome.depth {
-            let mut solved = vec![false; environment.output_size as usize];
+            let mut solved = vec![false; environment.output_size];
             let mut valid = vec![false; genome.nodes.len()];
             for i in 0..environment.input_size as usize {
                 *activations.get_mut(i).unwrap() = input.get_channel(i);
@@ -151,7 +165,7 @@ impl Activate {
             for bias in (environment.input_size + environment.output_size)
                 ..(environment.input_size + environment.output_size * 2)
             {
-                let bias = bias as usize;
+                let bias = bias;
                 *activations.get_mut(bias).unwrap() = 1.0;
                 *summations.get_mut(bias).unwrap() = 1.0;
                 *valid.get_mut(bias).unwrap() = true;
@@ -216,5 +230,6 @@ impl Activate {
                 _ => panic!("no-channel"),
             }
         }
+        storage.get_mut(trigger.entity()).unwrap().values = activations;
     }
 }
