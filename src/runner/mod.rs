@@ -1,4 +1,4 @@
-use crate::runner::game::{Game, Running};
+use crate::runner::game::{Game, GameGrid, Running};
 use crate::runner::genome::{Evaluation, MaxDepthCheck, NetworkInput, NetworkOutput, Reward};
 use crate::runner::species::{Speciate, Species};
 use environment::Environment;
@@ -98,6 +98,7 @@ impl RunnerIn {
             .spawn(Leaf::new().stem(Some(game_speed)).elevation(0))
             .id();
         tree.insert_resource(GameSpeed::new(1));
+        let game_grid = GameGrid::new(60, 30);
         let mut runner = Runner {
             population: vec![],
             species: vec![],
@@ -108,16 +109,16 @@ impl RunnerIn {
             species_id_gen: 0,
             genome_id_gen: 0,
             finished: environment.population_count,
+            game_grid,
         };
-        let game_grid = (60, 30);
         let reward = Reward::new(5.0, 1.75, 0.75);
         let expanded_view = tree.spawn(Leaf::new().stem(Some(root)).elevation(-1)).id();
         // TODO elements of expanded-view (game, network, score-label, finished-signal, switch-view)
         for p in 0..environment.population_count {
-            let view = tree.spawn(Leaf::new().stem(Some(grid))).id();
-            let score_label = tree.spawn(Leaf::new().stem(Some(view))).id();
-            let finished_signal = tree.spawn(Leaf::new().stem(Some(view))).id();
-            let g = tree.spawn(Leaf::new().stem(Some(view)).elevation(0)).id();
+            let view = tree.spawn(Leaf::new().stem(Some(grid))).id(); // panel for game-card
+            let score_label = tree.spawn(Leaf::new().stem(Some(view))).id(); // text
+            let finished_signal = tree.spawn(Leaf::new().stem(Some(view))).id(); // circle-panel color-changing
+            let g = tree.spawn(Leaf::new().stem(Some(view)).elevation(0)).id(); // genome
             tree.entity(view).insert(GenomeView {
                 score: score_label,
                 finished_signal,
@@ -129,10 +130,7 @@ impl RunnerIn {
                 environment.output_size,
             );
             tree.entity(g).insert(genome);
-            let snake = tree.spawn(Leaf::new().stem(Some(g))).id();
-            let food = tree.spawn(Leaf::new().stem(Some(g))).id();
-            let canvas = tree.spawn(Leaf::new().stem(Some(g))).id();
-            let game = Game::new(&mut tree, snake, food, canvas, game_grid);
+            let game = Game::new(&mut tree, g, game_grid);
             tree.entity(g)
                 .insert(game)
                 .insert(Running(false))
@@ -203,6 +201,7 @@ pub(crate) struct Runner {
     pub(crate) species_id_gen: SpeciesId,
     pub(crate) genome_id_gen: GenomeId,
     pub(crate) finished: i32,
+    pub(crate) game_grid: GameGrid,
 }
 #[derive(Component, Copy, Clone)]
 pub(crate) struct GenomeView {
@@ -284,11 +283,9 @@ pub(crate) struct EvaluateGenome {}
 impl EvaluateGenome {
     pub(crate) fn obs(trigger: Trigger<Self>, mut tree: Tree, mut runner: ResMut<Runner>) {
         let genome = trigger.entity();
-        // reset score
         tree.entity(genome).insert(Evaluation::default());
-        // reset snake
-        // reset food
-        // start game
+        let game = Game::new(&mut tree, genome, runner.game_grid);
+        tree.entity(genome).insert(game);
         tree.entity(genome).insert(Running(true));
         runner.finished = (runner.finished - 1).max(0);
     }

@@ -2,10 +2,13 @@ use crate::runner::environment::Environment;
 use crate::runner::genome::{Activate, Evaluation, NetworkInput, NetworkOutput, Reward};
 use crate::runner::{Process, Runner};
 use foliage::bevy_ecs;
+use foliage::bevy_ecs::component::{ComponentHooks, ComponentId, StorageType};
 use foliage::bevy_ecs::event::Event;
 use foliage::bevy_ecs::prelude::{Component, Entity, Resource, Trigger};
 use foliage::bevy_ecs::query::With;
 use foliage::bevy_ecs::system::{Query, Res, ResMut};
+use foliage::bevy_ecs::world::DeferredWorld;
+use foliage::leaf::Leaf;
 use foliage::time::{Time, TimeDelta};
 use foliage::tree::Tree;
 
@@ -40,12 +43,12 @@ impl GameSpeed {
         val
     }
 }
-#[derive(Component, Clone)]
+#[derive(Clone)]
 pub(crate) struct Game {
     pub(crate) snake: Snake,
     pub(crate) food: Segment,
     pub(crate) canvas: Entity,
-    pub(crate) grid: (i32, i32),
+    pub(crate) grid: GameGrid,
     pub(crate) collected_food: bool,
     pub(crate) last_head_location: Location,
 }
@@ -55,24 +58,57 @@ pub(crate) struct RewardStatus {
     pub(crate) moved_towards_food: bool,
     pub(crate) collected_food: bool,
 }
+#[derive(Copy, Clone)]
+pub(crate) struct GameGrid {
+    pub(crate) grid: (i32, i32),
+}
+
+impl GameGrid {
+    pub(crate) fn new(x: i32, y: i32) -> Self {
+        Self { grid: (x, y) }
+    }
+}
+
 impl Game {
-    pub(crate) fn new(tree: &mut Tree, snake: Entity, food: Entity, canvas: Entity, game_grid: (i32, i32)) -> Self {
-        let snake = Snake { segments: vec![] };
+    pub(crate) const STARTING_SEGMENTS: i32 = 6;
+    pub(crate) fn new(tree: &mut Tree, g: Entity, game_grid: GameGrid) -> Self {
+        let mut snake = Snake { segments: vec![] };
+        for s in 0..Self::STARTING_SEGMENTS {
+            let panel = tree.spawn(Leaf::new().stem(Some(g))).id();
+            let location = Location::default();
+            snake.segments.push(Segment { panel, location });
+        }
         let food = Segment {
-            panel: food,
+            panel: tree.spawn(Leaf::new().stem(Some(g))).id(),
             location: Location::default(),
         };
+        let canvas = tree.spawn(Leaf::new().stem(Some(g))).id();
         Self {
             snake,
             food,
             canvas,
             grid: game_grid,
             collected_food: false,
-            last_head_location: Default::default(),// same as above for starting head location
+            last_head_location: Default::default(), // same as above for starting head location
         }
     }
     pub(crate) fn reward_status(&self) -> RewardStatus {
         todo!()
+    }
+    fn on_remove(mut world: DeferredWorld, this: Entity, _c: ComponentId) {
+        let value = world.get::<Game>(this).unwrap().clone();
+        // despawn ids
+        for s in value.snake.segments.iter() {
+            world.commands().entity(s.panel).despawn();
+        }
+        world.commands().entity(value.food.panel).despawn();
+        world.commands().entity(value.canvas).despawn();
+    }
+}
+impl Component for Game {
+    const STORAGE_TYPE: StorageType = StorageType::Table;
+    fn register_component_hooks(_hooks: &mut ComponentHooks) {
+        _hooks.on_remove(Self::on_remove);
     }
 }
 #[derive(Component, Copy, Clone)]
@@ -96,14 +132,24 @@ pub(crate) fn run(
 #[derive(Event)]
 pub(crate) struct SetNetworkInput {}
 impl SetNetworkInput {
-    pub(crate) fn obs(trigger: Trigger<Self>, mut tree: Tree, mut inputs: Query<&mut NetworkInput>, game: Query<&Game>) {
+    pub(crate) fn obs(
+        trigger: Trigger<Self>,
+        mut tree: Tree,
+        mut inputs: Query<&mut NetworkInput>,
+        game: Query<&Game>,
+    ) {
         // evaluate state of game + set NetworkInput
     }
 }
 #[derive(Event)]
 pub(crate) struct MoveWithNetworkOutput {}
 impl MoveWithNetworkOutput {
-    pub(crate) fn obs(trigger: Trigger<Self>, mut tree: Tree, outputs: Query<&NetworkOutput>, mut game: Query<&mut Game>) {
+    pub(crate) fn obs(
+        trigger: Trigger<Self>,
+        mut tree: Tree,
+        outputs: Query<&NetworkOutput>,
+        mut game: Query<&mut Game>,
+    ) {
         // move snake
         // if hit => end [Running(false)] + runner.finished += 1
         // update snake segment locations (animate to next over frames_to_skip - 0.01)
