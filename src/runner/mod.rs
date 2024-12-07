@@ -340,6 +340,8 @@ impl Speciate {
                 // new
             }
         }
+        // empty (remove species entity from list + despawn)
+        // set this generation repr
     }
 }
 pub(crate) struct CompatibilityFactors {
