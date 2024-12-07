@@ -20,17 +20,24 @@ pub(crate) struct Species {
     pub(crate) members: Vec<Entity>,
     pub(crate) last_improved: Generation,
     pub(crate) representative: Entity,
+    pub(crate) repr_genome: Genome,
     pub(crate) max_fitness: Fitness,
     pub(crate) shared_fitness: Fitness,
     pub(crate) percent_total: f32,
 }
 impl Species {
-    pub(crate) fn new(id: SpeciesId, representative: Entity, last_improved: Generation) -> Self {
+    pub(crate) fn new(
+        id: SpeciesId,
+        representative: Entity,
+        repr_genome: Genome,
+        last_improved: Generation,
+    ) -> Self {
         Self {
             id,
             members: vec![representative],
             last_improved,
             representative,
+            repr_genome,
             max_fitness: 0.0,
             shared_fitness: 0.0,
             percent_total: 0.0,
@@ -55,7 +62,7 @@ impl Speciate {
             let mut found = None;
             for s in runner.species.iter().cloned() {
                 let genome = population.get(p).unwrap();
-                let repr = population.get(s.representative).unwrap();
+                let repr = s.repr_genome;
                 let mut compatibility = Compatibility::new();
                 let repr_innovation_max = repr
                     .connections
@@ -113,7 +120,9 @@ impl Speciate {
                 let id = runner.species_id_gen;
                 runner.species_id_gen += 1;
                 let gen = runner.generation;
-                runner.species.push(Species::new(id, p, gen));
+                runner
+                    .species
+                    .push(Species::new(id, p, population.get(p).unwrap().clone(), gen));
             }
         }
         let mut empty = vec![];
@@ -122,6 +131,7 @@ impl Speciate {
                 let rand_idx = rand::thread_rng().gen_range(0..species.members.len());
                 let representative = *species.members.get(rand_idx).unwrap();
                 species.representative = representative;
+                species.repr_genome = population.get(species.representative).unwrap().clone();
             } else {
                 empty.push(species.id);
             }
