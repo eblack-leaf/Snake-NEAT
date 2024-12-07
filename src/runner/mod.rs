@@ -251,10 +251,10 @@ impl SelectGenome {
     pub(crate) fn on_click(
         trigger: Trigger<OnClick>,
         mut tree: Tree,
-        game_views: Query<&GenomeView>,
+        genome_views: Query<&GenomeView>,
     ) {
         let view = trigger.entity();
-        let genome = game_views.get(view).unwrap().genome;
+        let genome = genome_views.get(view).unwrap().genome;
         // copy genome to expanded-view.genome (deep copy not just clone component)
     }
 }
