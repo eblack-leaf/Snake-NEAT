@@ -87,6 +87,7 @@ impl RunnerIn {
             species: vec![],
             generation: 0,
             requested_generation: 1,
+            run_to: false,
             best: None,
             species_id_gen: 0,
             genome_id_gen: 0,
