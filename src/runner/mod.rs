@@ -56,9 +56,17 @@ impl RunnerIn {
         environment.output_size = 2;
         environment.compatibility_factors.c1 = 1.0;
         environment.compatibility_factors.c2 = 1.0;
-        environment.compatibility_factors.c3 = 0.5;
+        environment.compatibility_factors.c3 = 0.4;
         environment.compatibility_threshold = 3.0;
         environment.stagnation_threshold = 15;
+        environment.elitism = 0.2;
+        environment.add_connection = 0.2;
+        environment.add_node = 0.07;
+        environment.inherit_disable = 0.75;
+        environment.only_mutate = 0.25;
+        environment.crossover_only = 0.2;
+        environment.connection_weight = 0.8;
+        environment.perturb = 0.9;
         let root = tree
             .spawn(Leaf::new().stem(Some(trigger.event().root)))
             .id();
