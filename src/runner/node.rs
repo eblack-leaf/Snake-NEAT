@@ -5,7 +5,6 @@ use foliage::bevy_ecs::component::Component;
 pub(crate) struct Node {
     pub(crate) id: NodeId,
     pub(crate) ty: NodeType,
-    pub(crate) value: f32,
 }
 
 impl Node {
@@ -13,12 +12,14 @@ impl Node {
         Self {
             id: 0,
             ty: NodeType::Hidden,
-            value: 0.0,
         }
+    }
+    pub(crate) fn explicit(id: NodeId, ty: NodeType) -> Self {
+        Self { id, ty }
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub(crate) enum NodeType {
     Input,
     Output,

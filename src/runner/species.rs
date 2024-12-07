@@ -1,5 +1,4 @@
 use crate::runner::compatibility::Compatibility;
-use crate::runner::connection::Connection;
 use crate::runner::environment::Environment;
 use crate::runner::genome::Genome;
 use crate::runner::node::Node;
@@ -11,7 +10,10 @@ use foliage::bevy_ecs::entity::Entity;
 use foliage::bevy_ecs::event::Event;
 use foliage::bevy_ecs::observer::Trigger;
 use foliage::bevy_ecs::prelude::Query;
+use foliage::bevy_ecs::system::ResMut;
 use foliage::tree::Tree;
+use rand::Rng;
+
 #[derive(Component, Clone)]
 pub(crate) struct Species {
     pub(crate) id: SpeciesId,
@@ -22,7 +24,19 @@ pub(crate) struct Species {
     pub(crate) shared_fitness: Fitness,
     pub(crate) percent_total: f32,
 }
-
+impl Species {
+    pub(crate) fn new(id: SpeciesId, representative: Entity, last_improved: Generation) -> Self {
+        Self {
+            id,
+            members: vec![representative],
+            last_improved,
+            representative,
+            max_fitness: 0.0,
+            shared_fitness: 0.0,
+            percent_total: 0.0,
+        }
+    }
+}
 #[derive(Event)]
 pub(crate) struct Speciate {}
 
@@ -30,46 +44,30 @@ impl Speciate {
     pub(crate) fn obs(
         trigger: Trigger<Self>,
         mut tree: Tree,
-        runner: Res<Runner>,
-        mut species: Query<&mut Species>,
+        mut runner: ResMut<Runner>,
         mut population: Query<&mut Genome>,
-        mut connections: Query<&mut Connection>,
-        mut nodes: Query<&mut Node>,
         environment: Res<Environment>,
     ) {
-        for s in runner.species.iter() {
-            species.get_mut(*s).unwrap().members.clear()
+        for s in runner.species.iter_mut() {
+            s.members.clear()
         }
-        for genome in runner
-            .population
-            .iter()
-            .map(|p| population.get(*p).unwrap())
-        {
+        for p in runner.population.clone().iter().copied() {
             let mut found = None;
-            for s in runner
-                .species
-                .iter()
-                .cloned()
-                .map(|s| species.get(s).unwrap())
-            {
+            for s in runner.species.iter().cloned() {
+                let genome = population.get(p).unwrap();
                 let repr = population.get(s.representative).unwrap();
                 let mut compatibility = Compatibility::new();
                 let repr_innovation_max = repr
                     .connections
                     .iter()
-                    .map(|c| connections.get(*c).unwrap().innovation)
+                    .map(|c| c.innovation)
                     .max()
                     .unwrap_or_default();
                 let mut num_weights = 0.0;
-                for conn in genome
-                    .connections
-                    .iter()
-                    .map(|c| connections.get(*c).unwrap())
-                {
+                for conn in genome.connections.iter() {
                     let matching = repr
                         .connections
                         .iter()
-                        .map(|c| connections.get(*c).unwrap())
                         .find(|c| c.innovation == conn.innovation);
                     if let Some(matching) = matching {
                         compatibility.weight_difference += conn.weight - matching.weight;
@@ -84,20 +82,13 @@ impl Speciate {
                 let repr_node_max = repr
                     .nodes
                     .iter()
-                    .map(|n| nodes.get(*n).unwrap())
                     .max_by(|a, b| a.id.partial_cmp(&b.id).unwrap())
                     .unwrap_or(&Node::new())
                     .id;
-                for node in genome.nodes.iter().map(|n| nodes.get(*n).unwrap()) {
+                for node in genome.nodes.iter() {
                     if node.id > repr_node_max {
                         compatibility.excess += 1.0;
-                    } else if repr
-                        .nodes
-                        .iter()
-                        .map(|n| nodes.get(*n).unwrap())
-                        .find(|n| n.id == node.id)
-                        .is_none()
-                    {
+                    } else if repr.nodes.iter().find(|n| n.id == node.id).is_none() {
                         compatibility.disjoint += 1.0;
                     }
                 }
@@ -113,12 +104,35 @@ impl Speciate {
             }
             if let Some(f) = found {
                 // add to existing
+                let idx = runner.species.iter().position(|s| s.id == f).unwrap();
+                runner.species.get_mut(idx).unwrap().members.push(p);
                 // set genome species-id
+                population.get_mut(p).unwrap().species = f;
             } else {
                 // new
+                let id = runner.species_id_gen;
+                runner.species_id_gen += 1;
+                let gen = runner.generation;
+                runner.species.push(Species::new(id, p, gen));
             }
         }
-        // empty (remove species entity from list + despawn)
-        // set this generation repr
+        let mut empty = vec![];
+        for species in runner.species.iter_mut() {
+            if !species.members.is_empty() {
+                let rand_idx = rand::thread_rng().gen_range(0..species.members.len());
+                let representative = *species.members.get(rand_idx).unwrap();
+                species.representative = representative;
+            } else {
+                empty.push(species.id);
+            }
+        }
+        for id in empty.iter_mut() {
+            *id = runner.species.iter().position(|s| s.id == *id).unwrap();
+        }
+        empty.sort();
+        empty.reverse();
+        for idx in empty {
+            runner.species.remove(idx);
+        }
     }
 }

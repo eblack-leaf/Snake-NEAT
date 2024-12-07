@@ -4,8 +4,8 @@ use foliage::bevy_ecs::prelude::Resource;
 #[derive(Resource)]
 pub(crate) struct Environment {
     pub(crate) population_count: i32,
-    pub(crate) input_size: i32,
-    pub(crate) output_size: i32,
+    pub(crate) input_size: usize,
+    pub(crate) output_size: usize,
     pub(crate) compatibility_factors: CompatibilityFactors,
     pub(crate) compatibility_threshold: f32,
     // other configurations

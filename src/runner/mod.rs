@@ -1,5 +1,6 @@
 use crate::runner::game::{Game, Running};
 use crate::runner::genome::{Evaluation, NetworkInput, NetworkOutput, Reward};
+use crate::runner::species::{Speciate, Species};
 use environment::Environment;
 use foliage::bevy_ecs;
 use foliage::bevy_ecs::component::Component;
@@ -114,6 +115,7 @@ impl RunnerIn {
             });
             let genome = Genome::new(
                 &mut tree,
+                runner.genome_id_gen,
                 g,
                 environment.input_size,
                 environment.output_size,
@@ -172,9 +174,9 @@ impl RunnerOut {
         // despawn all ids
     }
 }
-pub(crate) type NodeId = i32;
-pub(crate) type GenomeId = i32;
-pub(crate) type SpeciesId = i32;
+pub(crate) type NodeId = usize;
+pub(crate) type GenomeId = usize;
+pub(crate) type SpeciesId = usize;
 pub(crate) type Generation = i32;
 pub(crate) type Innovation = i32;
 pub(crate) type Activation = f32;
@@ -184,7 +186,7 @@ pub(crate) type Fitness = f32;
 pub(crate) struct Runner {
     pub(crate) population: Vec<Entity>,
     pub(crate) next_gen: Vec<Genome>,
-    pub(crate) species: Vec<Entity>,
+    pub(crate) species: Vec<Species>,
     pub(crate) generation: Generation,
     pub(crate) requested_generation: Generation,
     pub(crate) run_to: bool,
@@ -289,5 +291,8 @@ impl Process {
         // cull
         // num_offspring
         // mutate & crossover (into runner.next_gen)
+        // max-depth
+        // speciate
+        tree.trigger(Speciate{});
     }
 }

@@ -18,7 +18,7 @@ impl ExistingInnovation {
             idx
         }
     }
-    pub(crate) fn new(inputs: i32, outputs: i32) -> Self {
+    pub(crate) fn new(inputs: usize, outputs: usize) -> Self {
         let mut generator = 0;
         let mut existing = HashMap::new();
         // fully-connected innovations
