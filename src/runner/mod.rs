@@ -7,6 +7,7 @@ use foliage::bevy_ecs::entity::Entity;
 use foliage::bevy_ecs::prelude::{Event, Res, Trigger};
 use foliage::bevy_ecs::system::{Query, ResMut, Resource};
 use foliage::grid::Grid;
+use foliage::interaction::OnClick;
 use foliage::leaf::Leaf;
 use foliage::text::TextValue;
 use foliage::tree::Tree;
@@ -29,6 +30,7 @@ pub(crate) struct RunnerIn {
 }
 #[derive(Resource)]
 pub(crate) struct RunnerIds {
+    pub(crate) root: Entity,
     pub(crate) gen: Entity,
     pub(crate) gen_text: Entity,
     pub(crate) gen_increment: Entity,
@@ -42,6 +44,7 @@ pub(crate) struct RunnerIds {
     pub(crate) game_speed_decrement: Entity,
     pub(crate) game_speed_label: Entity,
     pub(crate) game_speed_increment: Entity,
+    pub(crate) expanded_view: Entity,
 }
 impl RunnerIn {
     pub(crate) fn obs(trigger: Trigger<Self>, mut tree: Tree, environment: Res<Environment>) {
@@ -53,7 +56,9 @@ impl RunnerIn {
         environment.compatibility_factors.c2 = 1.0;
         environment.compatibility_factors.c3 = 0.5;
         environment.compatibility_threshold = 3.0;
-        let root = trigger.event().root;
+        let root = tree
+            .spawn(Leaf::new().stem(Some(trigger.event().root)))
+            .id();
         let gen = tree.spawn(Leaf::new().stem(Some(root)).elevation(-1)).id();
         let gen_text = tree.spawn(Leaf::new().stem(Some(gen)).elevation(0)).id();
         let gen_increment = tree.spawn(Leaf::new().stem(Some(gen)).elevation(0)).id();
@@ -95,8 +100,18 @@ impl RunnerIn {
         };
         let game_grid = (60, 30);
         let reward = Reward::new(5.0, 1.75, 0.75);
+        let expanded_view = tree.spawn(Leaf::new().stem(Some(root)).elevation(-1)).id();
+        // TODO elements of expanded-view (game, network, score-label, finished-signal, switch-view)
         for p in 0..environment.population_count {
-            let g = tree.spawn(Leaf::new().stem(Some(grid)).elevation(0)).id();
+            let view = tree.spawn(Leaf::new().stem(Some(grid))).id();
+            let score_label = tree.spawn(Leaf::new().stem(Some(view))).id();
+            let finished_signal = tree.spawn(Leaf::new().stem(Some(view))).id();
+            let g = tree.spawn(Leaf::new().stem(Some(view)).elevation(0)).id();
+            tree.entity(view).insert(GenomeView {
+                score: score_label,
+                finished_signal,
+                genome: g,
+            });
             let genome = Genome::new(
                 &mut tree,
                 g,
@@ -112,6 +127,7 @@ impl RunnerIn {
                 food,
                 canvas,
                 grid: game_grid,
+                updated: false,
             };
             tree.entity(g)
                 .insert(game)
@@ -126,6 +142,7 @@ impl RunnerIn {
         tree.insert_resource(runner);
         tree.insert_resource(environment);
         let ids = RunnerIds {
+            root,
             gen,
             gen_text,
             gen_increment,
@@ -139,6 +156,7 @@ impl RunnerIn {
             game_speed_decrement,
             game_speed_label,
             game_speed_increment,
+            expanded_view,
         };
         tree.insert_resource(ids);
     }
@@ -174,6 +192,12 @@ pub(crate) struct Runner {
     pub(crate) species_id_gen: SpeciesId,
     pub(crate) genome_id_gen: GenomeId,
     pub(crate) innovation: ExistingInnovation,
+}
+#[derive(Component, Copy, Clone)]
+pub(crate) struct GenomeView {
+    pub(crate) score: Entity,
+    pub(crate) finished_signal: Entity,
+    pub(crate) genome: Entity,
 }
 #[derive(Event)]
 pub(crate) struct UpdateSpeciesCountText {}
@@ -222,18 +246,39 @@ impl RunToGeneration {
     }
 }
 #[derive(Event)]
+pub(crate) struct SelectGenome {}
+impl SelectGenome {
+    pub(crate) fn on_click(
+        trigger: Trigger<OnClick>,
+        mut tree: Tree,
+        game_views: Query<&GenomeView>,
+    ) {
+        let view = trigger.entity();
+        let genome = game_views.get(view).unwrap().genome;
+        // copy genome to expanded-view.genome (deep copy not just clone component)
+    }
+}
+#[derive(Event)]
 pub(crate) struct Evaluate {}
 impl Evaluate {
     pub(crate) fn obs(trigger: Trigger<Self>, mut tree: Tree, runner: ResMut<Runner>) {
         // run game instance to completion on each genome
         for genome in runner.population.iter().cloned() {
-            // reset score
-            tree.entity(genome).insert(Evaluation::default());
-            // reset snake
-            // reset food
-            // start game
-            tree.entity(genome).insert(Running(true));
+            tree.trigger_targets(EvaluateGenome {}, genome);
         }
+    }
+}
+#[derive(Event)]
+pub(crate) struct EvaluateGenome {}
+impl EvaluateGenome {
+    pub(crate) fn obs(trigger: Trigger<Self>, mut tree: Tree) {
+        let genome = trigger.entity();
+        // reset score
+        tree.entity(genome).insert(Evaluation::default());
+        // reset snake
+        // reset food
+        // start game
+        tree.entity(genome).insert(Running(true));
     }
 }
 #[derive(Event)]

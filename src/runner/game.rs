@@ -12,13 +12,11 @@ pub(crate) struct Game {
     pub(crate) food: Entity,
     pub(crate) canvas: Entity,
     pub(crate) grid: (i32, i32),
+    pub(crate) updated: bool,
 }
 #[derive(Component, Copy, Clone)]
 pub(crate) struct Running(pub(crate) bool);
-pub(crate) fn run(
-    games: Query<(&Game, &Running, &Genome, &NetworkOutput)>,
-    snakes: Query<&Snake>,
-) {
+pub(crate) fn run(games: Query<(&Game, &Running, &Genome, &NetworkOutput)>, snakes: Query<&Snake>) {
     for (game, running, genome, output) in games.iter() {
         if running.0 {
             // process w/ output as movement
