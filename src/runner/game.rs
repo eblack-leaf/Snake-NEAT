@@ -72,7 +72,10 @@ impl GameGrid {
 impl Game {
     pub(crate) const STARTING_SEGMENTS: i32 = 6;
     pub(crate) fn new(tree: &mut Tree, g: Entity, game_grid: GameGrid) -> Self {
-        let mut snake = Snake { segments: vec![] };
+        let mut snake = Snake {
+            segments: vec![],
+            direction: Direction::Right,
+        };
         for s in 0..Self::STARTING_SEGMENTS {
             let panel = tree.spawn(Leaf::new().stem(Some(g))).id();
             let location = Location::default();
@@ -139,6 +142,50 @@ impl SetNetworkInput {
         game: Query<&Game>,
     ) {
         // evaluate state of game + set NetworkInput
+        let mut input = inputs.get_mut(trigger.entity()).unwrap();
+        let game = game.get(trigger.entity()).unwrap();
+        let head = game.snake.segments.get(0).unwrap().location;
+        let mut neighbors = vec![Location::default(); 4];
+        neighbors[0].x -= 1;
+        neighbors[1].y += 1;
+        neighbors[2].x += 1;
+        neighbors[3].y -= 1;
+        let neighbor_intersects_tail = neighbors
+            .iter()
+            .map(|n| {
+                game.snake
+                    .segments
+                    .iter()
+                    .find(|s| s.location == *n)
+                    .is_none()
+            })
+            .collect::<Vec<_>>();
+        match game.snake.direction {
+            Direction::Left => {
+                // neighbors.remove(2);
+                if !neighbor_intersects_tail[0] && head.x != 0 {
+                    input.can_move_forward = true;
+                }
+            }
+            Direction::Right => {
+                // neighbors.remove(0);
+                if !neighbor_intersects_tail[2] && head.x + 1 != game.grid.grid.0 {
+                    input.can_move_forward = true;
+                }
+            }
+            Direction::Up => {
+                // neighbors.remove(1);
+                if !neighbor_intersects_tail[3] && head.y != 0 {
+                    input.can_move_forward = true;
+                }
+            }
+            Direction::Down => {
+                // neighbors.remove(3);
+                if !neighbor_intersects_tail[1] && head.y + 1 != game.grid.grid.1 {
+                    input.can_move_forward = true;
+                }
+            }
+        }
     }
 }
 #[derive(Event)]
@@ -170,7 +217,6 @@ impl ComputeReward {
     ) {
         let mut eval = evaluations.get_mut(trigger.entity()).unwrap();
         let mut reward = rewards.get_mut(trigger.entity()).unwrap();
-        // set reward statuses
         let status = games.get(trigger.entity()).unwrap().reward_status();
         reward.can_move_towards_food = status.can_move_towards_food;
         reward.moved_towards_food = status.moved_towards_food;
@@ -185,7 +231,7 @@ impl ComputeReward {
         }
     }
 }
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Ord, PartialOrd, Eq, PartialEq, Debug)]
 pub(crate) struct Location {
     pub(crate) x: i32,
     pub(crate) y: i32,
@@ -198,4 +244,12 @@ pub(crate) struct Segment {
 #[derive(Component, Clone)]
 pub(crate) struct Snake {
     pub(crate) segments: Vec<Segment>,
+    pub(crate) direction: Direction,
+}
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
+pub(crate) enum Direction {
+    Left,
+    Right,
+    Up,
+    Down,
 }
