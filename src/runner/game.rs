@@ -1,5 +1,5 @@
 use crate::runner::environment::Environment;
-use crate::runner::genome::{Activate, Evaluation, NetworkInput, NetworkOutput, Reward};
+use crate::runner::genome::{Activate, Evaluation, Genome, NetworkInput, NetworkOutput, Reward};
 use crate::runner::{GenomeView, Process, Runner};
 use foliage::bevy_ecs;
 use foliage::bevy_ecs::component::{ComponentHooks, ComponentId, StorageType};
@@ -16,6 +16,7 @@ use foliage::grid::unit::TokenUnit;
 use foliage::grid::Grid;
 use foliage::leaf::{EvaluateCore, Leaf};
 use foliage::panel::{Panel, Rounding};
+use foliage::text::TextValue;
 use foliage::time::{Time, TimeDelta};
 use foliage::tree::Tree;
 
@@ -46,7 +47,9 @@ impl GameSpeed {
         self.delta += time.frame_diff();
         let frames_to_skip = self.frames_to_skip();
         let val = self.delta >= frames_to_skip;
-        self.delta -= frames_to_skip;
+        if val {
+            self.delta = TimeDelta::default();
+        }
         val
     }
 }
@@ -59,6 +62,8 @@ pub(crate) struct Game {
     pub(crate) collected_food: bool,
     pub(crate) last_tail_location: Location,
     pub(crate) wrapper: Entity,
+    pub(crate) can_move_towards_food: bool,
+    pub(crate) neighbor_distances: Vec<f32>,
 }
 #[derive(Copy, Clone)]
 pub(crate) struct RewardStatus {
@@ -93,7 +98,7 @@ impl Game {
             .insert(
                 ResponsiveLocation::new()
                     .left(stem().left())
-                    .right(stem().right())
+                    .top(stem().top())
                     .width(canvas_size.0.px())
                     .height(canvas_size.1.px()),
             )
@@ -136,6 +141,7 @@ impl Game {
                         .bottom(location.y.row().end().of(stem())),
                 )
                 .insert(ScrollContext::new(wrapper))
+                .insert(EvaluateCore::recursive())
                 .id(),
             location: Location::default(),
         };
@@ -148,10 +154,32 @@ impl Game {
             collected_food: false,
             last_tail_location: last,
             wrapper,
+            can_move_towards_food: false,
+            neighbor_distances: vec![],
         }
     }
+    pub(crate) fn distance(a: Location, b: Location) -> f32 {
+        ((a.x as f32 - b.x as f32).powi(2) + (a.y as f32 - b.y as f32).powi(2)).sqrt()
+    }
     pub(crate) fn reward_status(&self) -> RewardStatus {
-        todo!()
+        let mut status = RewardStatus {
+            can_move_towards_food: true,
+            moved_towards_food: false,
+            collected_food: false,
+        };
+        if self.collected_food {
+            status.collected_food = true;
+        } else {
+            let last = self.snake.segments.get(1).unwrap().location;
+            let current = self.snake.segments.get(0).unwrap().location;
+            let prev = Self::distance(self.food.location, last);
+            let now = Self::distance(self.food.location, current);
+            if prev >= now {
+                status.moved_towards_food = true;
+            }
+            status.can_move_towards_food = self.can_move_towards_food;
+        }
+        status
     }
     fn on_remove(mut world: DeferredWorld, this: Entity, _c: ComponentId) {
         let value = world.get::<Game>(this).unwrap().clone();
@@ -194,11 +222,11 @@ impl SetNetworkInput {
         trigger: Trigger<Self>,
         mut tree: Tree,
         mut inputs: Query<&mut NetworkInput>,
-        games: Query<&Game>,
+        mut games: Query<&mut Game>,
     ) {
         // evaluate state of game + set NetworkInput
         let mut input = inputs.get_mut(trigger.entity()).unwrap();
-        let game = games.get(trigger.entity()).unwrap();
+        let mut game = games.get_mut(trigger.entity()).unwrap();
         let head = game.snake.segments.get(0).unwrap().location;
         let mut neighbors = vec![head; 4];
         neighbors[0].x -= 1;
@@ -215,29 +243,53 @@ impl SetNetworkInput {
                     .is_none()
             })
             .collect::<Vec<_>>();
+        game.neighbor_distances = neighbors
+            .iter()
+            .map(|n| Game::distance(*n, game.food.location))
+            .collect::<Vec<_>>();
         match game.snake.direction {
             Direction::Left => {
-                // neighbors.remove(2);
                 if !neighbor_intersects_tail[0] && head.x != 0 {
                     input.can_move_forward = true;
                 }
+                if !neighbor_intersects_tail[1] && head.y + 1 != game.grid.grid.1 {
+                    input.can_move_left = true;
+                }
+                if !neighbor_intersects_tail[3] && head.y != 0 {
+                    input.can_move_right = true;
+                }
             }
             Direction::Right => {
-                // neighbors.remove(0);
                 if !neighbor_intersects_tail[2] && head.x + 1 != game.grid.grid.0 {
                     input.can_move_forward = true;
                 }
+                if !neighbor_intersects_tail[1] && head.y + 1 != game.grid.grid.1 {
+                    input.can_move_right = true;
+                }
+                if !neighbor_intersects_tail[3] && head.y != 0 {
+                    input.can_move_left = true;
+                }
             }
             Direction::Up => {
-                // neighbors.remove(1);
                 if !neighbor_intersects_tail[3] && head.y != 0 {
                     input.can_move_forward = true;
                 }
+                if !neighbor_intersects_tail[0] && head.x != 0 {
+                    input.can_move_left = true;
+                }
+                if !neighbor_intersects_tail[2] && head.x + 1 != game.grid.grid.0 {
+                    input.can_move_right = true;
+                }
             }
             Direction::Down => {
-                // neighbors.remove(3);
                 if !neighbor_intersects_tail[1] && head.y + 1 != game.grid.grid.1 {
                     input.can_move_forward = true;
+                }
+                if !neighbor_intersects_tail[2] && head.x + 1 != game.grid.grid.0 {
+                    input.can_move_right = true;
+                }
+                if !neighbor_intersects_tail[0] && head.x != 0 {
+                    input.can_move_left = true;
                 }
             }
         }
@@ -249,6 +301,7 @@ impl MoveWithNetworkOutput {
     pub(crate) fn obs(
         trigger: Trigger<Self>,
         mut tree: Tree,
+        inputs: Query<&NetworkInput>,
         outputs: Query<&NetworkOutput>,
         mut games: Query<&mut Game>,
         mut runner: ResMut<Runner>,
@@ -257,12 +310,15 @@ impl MoveWithNetworkOutput {
         let mut game = games.get_mut(trigger.entity()).unwrap();
         let view = views.get(trigger.entity()).unwrap();
         let mut new_head = game.snake.segments.get(0).unwrap().location;
+        let current_head = new_head;
+        let input = inputs.get(trigger.entity()).unwrap();
         let mut neighbors = vec![new_head; 4];
         neighbors[0].x -= 1;
         neighbors[1].y += 1;
         neighbors[2].x += 1;
         neighbors[3].y -= 1;
         // move snake
+        game.can_move_towards_food = false;
         let output = outputs.get(trigger.entity()).unwrap();
         if output.move_left {
             // left
@@ -270,18 +326,54 @@ impl MoveWithNetworkOutput {
                 Direction::Left => {
                     new_head = neighbors[1];
                     game.snake.direction = Direction::Down;
+                    let current = Game::distance(current_head, game.food.location);
+                    let projected = *game.neighbor_distances.get(0).unwrap();
+                    if projected < current && input.can_move_forward {
+                        game.can_move_towards_food = true;
+                    }
+                    let projected = *game.neighbor_distances.get(3).unwrap();
+                    if projected < current && input.can_move_right {
+                        game.can_move_towards_food = true;
+                    }
                 }
                 Direction::Right => {
                     new_head = neighbors[3];
                     game.snake.direction = Direction::Up;
+                    let current = Game::distance(current_head, game.food.location);
+                    let projected = *game.neighbor_distances.get(1).unwrap();
+                    if projected < current && input.can_move_right {
+                        game.can_move_towards_food = true;
+                    }
+                    let projected = *game.neighbor_distances.get(2).unwrap();
+                    if projected < current && input.can_move_forward {
+                        game.can_move_towards_food = true;
+                    }
                 }
                 Direction::Up => {
                     new_head = neighbors[0];
                     game.snake.direction = Direction::Left;
+                    let current = Game::distance(current_head, game.food.location);
+                    let projected = *game.neighbor_distances.get(2).unwrap();
+                    if projected < current && input.can_move_right {
+                        game.can_move_towards_food = true;
+                    }
+                    let projected = *game.neighbor_distances.get(3).unwrap();
+                    if projected < current && input.can_move_forward {
+                        game.can_move_towards_food = true;
+                    }
                 }
                 Direction::Down => {
                     new_head = neighbors[2];
                     game.snake.direction = Direction::Right;
+                    let current = Game::distance(current_head, game.food.location);
+                    let projected = *game.neighbor_distances.get(1).unwrap();
+                    if projected < current && input.can_move_forward {
+                        game.can_move_towards_food = true;
+                    }
+                    let projected = *game.neighbor_distances.get(0).unwrap();
+                    if projected < current && input.can_move_right {
+                        game.can_move_towards_food = true;
+                    }
                 }
             }
         } else if output.move_right {
@@ -290,18 +382,54 @@ impl MoveWithNetworkOutput {
                 Direction::Left => {
                     new_head = neighbors[3];
                     game.snake.direction = Direction::Up;
+                    let current = Game::distance(current_head, game.food.location);
+                    let projected = *game.neighbor_distances.get(0).unwrap();
+                    if projected < current && input.can_move_forward {
+                        game.can_move_towards_food = true;
+                    }
+                    let projected = *game.neighbor_distances.get(1).unwrap();
+                    if projected < current && input.can_move_left {
+                        game.can_move_towards_food = true;
+                    }
                 }
                 Direction::Right => {
                     new_head = neighbors[1];
                     game.snake.direction = Direction::Down;
+                    let current = Game::distance(current_head, game.food.location);
+                    let projected = *game.neighbor_distances.get(2).unwrap();
+                    if projected < current && input.can_move_forward {
+                        game.can_move_towards_food = true;
+                    }
+                    let projected = *game.neighbor_distances.get(3).unwrap();
+                    if projected < current && input.can_move_left {
+                        game.can_move_towards_food = true;
+                    }
                 }
                 Direction::Up => {
                     new_head = neighbors[2];
                     game.snake.direction = Direction::Right;
+                    let current = Game::distance(current_head, game.food.location);
+                    let projected = *game.neighbor_distances.get(3).unwrap();
+                    if projected < current && input.can_move_forward {
+                        game.can_move_towards_food = true;
+                    }
+                    let projected = *game.neighbor_distances.get(0).unwrap();
+                    if projected < current && input.can_move_left {
+                        game.can_move_towards_food = true;
+                    }
                 }
                 Direction::Down => {
                     new_head = neighbors[0];
                     game.snake.direction = Direction::Left;
+                    let current = Game::distance(current_head, game.food.location);
+                    let projected = *game.neighbor_distances.get(1).unwrap();
+                    if projected < current && input.can_move_forward {
+                        game.can_move_towards_food = true;
+                    }
+                    let projected = *game.neighbor_distances.get(0).unwrap();
+                    if projected < current && input.can_move_left {
+                        game.can_move_towards_food = true;
+                    }
                 }
             }
         } else {
@@ -309,15 +437,51 @@ impl MoveWithNetworkOutput {
             match game.snake.direction {
                 Direction::Left => {
                     new_head = neighbors[0];
+                    let current = Game::distance(current_head, game.food.location);
+                    let projected = *game.neighbor_distances.get(1).unwrap();
+                    if projected < current && input.can_move_left {
+                        game.can_move_towards_food = true;
+                    }
+                    let projected = *game.neighbor_distances.get(3).unwrap();
+                    if projected < current && input.can_move_right {
+                        game.can_move_towards_food = true;
+                    }
                 }
                 Direction::Right => {
                     new_head = neighbors[2];
+                    let current = Game::distance(current_head, game.food.location);
+                    let projected = *game.neighbor_distances.get(3).unwrap();
+                    if projected < current && input.can_move_left {
+                        game.can_move_towards_food = true;
+                    }
+                    let projected = *game.neighbor_distances.get(1).unwrap();
+                    if projected < current && input.can_move_right {
+                        game.can_move_towards_food = true;
+                    }
                 }
                 Direction::Up => {
                     new_head = neighbors[3];
+                    let current = Game::distance(current_head, game.food.location);
+                    let projected = *game.neighbor_distances.get(0).unwrap();
+                    if projected < current && input.can_move_left {
+                        game.can_move_towards_food = true;
+                    }
+                    let projected = *game.neighbor_distances.get(2).unwrap();
+                    if projected < current && input.can_move_right {
+                        game.can_move_towards_food = true;
+                    }
                 }
                 Direction::Down => {
                     new_head = neighbors[1];
+                    let current = Game::distance(current_head, game.food.location);
+                    let projected = *game.neighbor_distances.get(2).unwrap();
+                    if projected < current && input.can_move_left {
+                        game.can_move_towards_food = true;
+                    }
+                    let projected = *game.neighbor_distances.get(0).unwrap();
+                    if projected < current && input.can_move_right {
+                        game.can_move_towards_food = true;
+                    }
                 }
             }
         }
@@ -388,9 +552,12 @@ impl ComputeReward {
         mut runner: ResMut<Runner>,
         environment: Res<Environment>,
         mut rewards: Query<&mut Reward>,
-        mut evaluations: Query<&mut Evaluation>,
+        mut evaluations: Query<(Entity, &mut Evaluation)>,
+        genomes: Query<&Genome>,
+        views: Query<&GenomeView>,
+        mut texts: Query<&mut TextValue>,
     ) {
-        let mut eval = evaluations.get_mut(trigger.entity()).unwrap();
+        let (_, mut eval) = evaluations.get_mut(trigger.entity()).unwrap();
         let mut reward = rewards.get_mut(trigger.entity()).unwrap();
         let status = games.get(trigger.entity()).unwrap().reward_status();
         reward.can_move_towards_food = status.can_move_towards_food;
@@ -401,8 +568,25 @@ impl ComputeReward {
             tree.entity(trigger.entity()).insert(Running(false));
         }
         eval.fitness += reward.value();
-        if runner.finished == environment.population_count && runner.run_to {
-            tree.trigger(Process {});
+        let view = views.get(trigger.entity()).unwrap();
+        texts.get_mut(view.score).unwrap().0 = format!("Score: {}", eval.fitness);
+        drop(eval);
+        if runner.finished == environment.population_count {
+            // give info to best
+            let current_best = evaluations
+                .iter()
+                .map(|a| (a.0, *a.1))
+                .max_by(|a, b| a.1.fitness.partial_cmp(&b.1.fitness).unwrap())
+                .unwrap();
+            if current_best.1.fitness > runner.best.as_ref().unwrap().1.fitness {
+                runner
+                    .best
+                    .replace((genomes.get(current_best.0).unwrap().clone(), current_best.1));
+                // TODO update best score label + genome
+            }
+            if runner.run_to {
+                tree.trigger(Process {});
+            }
         }
     }
 }

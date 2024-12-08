@@ -32,6 +32,9 @@ impl Genome {
         for output in input_size..input_size + output_size {
             nodes.push(Node::explicit(output, NodeType::Output));
         }
+        for bias in input_size + output_size..input_size + output_size * 2 {
+            nodes.push(Node::explicit(bias, NodeType::Bias));
+        }
         let node_id_gen = nodes.len();
         let mut innovation = 0;
         for i in 0..input_size {

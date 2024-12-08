@@ -11,6 +11,7 @@ use overview::VIEW_AREA;
 fn main() {
     let mut foliage = Foliage::new();
     foliage.set_desktop_size(VIEW_AREA);
+    foliage.attach_root::<runner::Runner>();
     foliage.ecs().branch(Twig::new(Overview {}));
     foliage.photosynthesize();
 }

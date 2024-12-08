@@ -1,17 +1,18 @@
-use crate::overview::{IconHandles, SECTION_OUT_END};
+use crate::overview::{IconHandles, SECTION_OUT_END, SIDE_PANEL_WIDTH, VIEW_AREA};
 use crate::runner::game::{Game, GameGrid, Running};
-use crate::runner::genome::{Evaluation, MaxDepthCheck, NetworkInput, NetworkOutput, Reward};
+use crate::runner::genome::{Activations, Evaluation, MaxDepthCheck, NetworkInput, NetworkOutput, Reward};
 use crate::runner::species::{Speciate, Species};
 use environment::Environment;
 use foliage::anim::Animation;
-use foliage::bevy_ecs;
+use foliage::{bevy_ecs, Root};
 use foliage::bevy_ecs::component::Component;
 use foliage::bevy_ecs::entity::Entity;
-use foliage::bevy_ecs::prelude::{Event, Res, Trigger};
+use foliage::bevy_ecs::prelude::{Event, IntoSystemConfigs, Res, Trigger};
 use foliage::bevy_ecs::system::{Query, ResMut, Resource};
 use foliage::color::{Blue, Grey, Monochromatic, Orange};
 use foliage::coordinate::section::Section;
 use foliage::coordinate::LogicalContext;
+use foliage::elm::{Elm, ExternalStage};
 use foliage::grid::aspect::stem;
 use foliage::grid::responsive::evaluate::{ScrollContext, Scrollable};
 use foliage::grid::responsive::ResponsiveLocation;
@@ -33,12 +34,16 @@ use rand::Rng;
 mod compatibility;
 mod connection;
 pub(crate) mod environment;
-mod game;
-mod genome;
+pub(crate) mod game;
+pub(crate) mod genome;
 mod innovation;
 mod node;
-mod species;
-
+pub(crate) mod species;
+impl Root for Runner {
+    fn attach(elm: &mut Elm) {
+        elm.scheduler.main.add_systems(game::run.in_set(ExternalStage::Action));
+    }
+}
 #[derive(Event)]
 pub(crate) struct RunnerIn {
     pub(crate) root: Entity,
@@ -168,6 +173,7 @@ impl RunnerIn {
                     .height(button_size.px()),
             )
             .observe(RunToGeneration::obs)
+            .insert(EvaluateCore::recursive())
             .id();
         let gen_stop = tree
             .spawn(Leaf::new().stem(Some(gen)).elevation(0))
@@ -186,11 +192,12 @@ impl RunnerIn {
                     .height(button_size.px()),
             )
             .observe(StopGeneration::obs)
+            .insert(EvaluateCore::recursive())
             .id();
         let population_label = tree
             .spawn(Leaf::new().stem(Some(root)).elevation(-1))
             .insert(Text::new(
-                "Population: 0",
+                format!("Population: {}", environment.population_count),
                 FontSize::new(14),
                 Grey::plus_two(),
             ))
@@ -201,6 +208,7 @@ impl RunnerIn {
                     .top(20.percent().height().from(stem()))
                     .height((20 / 3).percent().height().of(stem())),
             )
+            .insert(EvaluateCore::recursive())
             .id();
         let species_label = tree
             .spawn(Leaf::new().stem(Some(root)).elevation(-1))
@@ -216,14 +224,11 @@ impl RunnerIn {
                     .top((20 + 20 / 3).percent().height().from(stem()))
                     .height((20 / 3).percent().height().of(stem())),
             )
+            .insert(EvaluateCore::recursive())
             .id();
         let num_running = tree
             .spawn(Leaf::new().stem(Some(root)).elevation(0))
-            .insert(Text::new(
-                "#-running: 0",
-                FontSize::new(14),
-                Grey::plus_two(),
-            ))
+            .insert(Text::new("Running: 0", FontSize::new(14), Grey::plus_two()))
             .insert(
                 ResponsiveLocation::new()
                     .left(stem().left())
@@ -250,6 +255,7 @@ impl RunnerIn {
                     .top(40.percent().height().from(stem())),
             )
             .observe(EvaluateWrapper::obs)
+            .insert(EvaluateCore::recursive())
             .id();
         let process = tree
             .spawn(Leaf::new().stem(Some(root)).elevation(-1))
@@ -268,6 +274,7 @@ impl RunnerIn {
                     .top(50.percent().height().from(stem())),
             )
             .observe(ProcessWrapper::obs)
+            .insert(EvaluateCore::recursive())
             .id();
         let game_speed = tree
             .spawn(Leaf::new().stem(Some(root)).elevation(-1))
@@ -278,6 +285,7 @@ impl RunnerIn {
                     .top(60.percent().height().from(stem()))
                     .height(20.percent().height().of(stem())),
             )
+            .insert(EvaluateCore::recursive())
             .id();
         let game_speed_decrement = tree
             .spawn(Leaf::new().stem(Some(game_speed)).elevation(0))
@@ -296,6 +304,7 @@ impl RunnerIn {
                     .height(button_size.px()),
             )
             .observe(GameSpeedChange::decrement)
+            .insert(EvaluateCore::recursive())
             .id();
         let game_speed_label = tree
             .spawn(Leaf::new().stem(Some(game_speed)).elevation(0))
@@ -307,6 +316,7 @@ impl RunnerIn {
                     .top(stem().top())
                     .bottom(50.percent().height().from(stem())),
             )
+            .insert(EvaluateCore::recursive())
             .id();
         let game_speed_increment = tree
             .spawn(Leaf::new().stem(Some(game_speed)).elevation(0))
@@ -325,6 +335,7 @@ impl RunnerIn {
                     .height(button_size.px()),
             )
             .observe(GameSpeedChange::increment)
+            .insert(EvaluateCore::recursive())
             .id();
         tree.insert_resource(GameSpeed::new(1));
         let game_grid = GameGrid::new(60, 30);
@@ -341,11 +352,11 @@ impl RunnerIn {
             game_grid,
             canvas_size: (0, 0),
         };
-        let main = sections.get(trigger.event().root).unwrap().width() as i32 - side;
+        let main = VIEW_AREA.0 as i32 - SIDE_PANEL_WIDTH as i32 - side;
         let element_label = 24;
         let element_size = (300, 150 + element_label);
         let num_columns = main / element_size.0;
-        let num_rows = (environment.population_count / num_columns).max(1);
+        let num_rows = (environment.population_count / num_columns).max(1) + 1;
         let view_size = (num_columns * element_size.0, num_rows * element_size.1);
         let canvas_size = (element_size.0, element_size.1 - element_label);
         runner.canvas_size = canvas_size;
@@ -359,6 +370,7 @@ impl RunnerIn {
                     .bottom(stem().bottom()),
             )
             .insert(Scrollable::new())
+            .insert(EvaluateCore::recursive())
             .id();
         let grid = tree
             .spawn(Leaf::new().stem(Some(root)).elevation(0))
@@ -371,6 +383,7 @@ impl RunnerIn {
                     .top(stem().top()),
             )
             .insert(ScrollContext::new(grid_wrapper))
+            .insert(EvaluateCore::recursive())
             .id();
         let reward = Reward::new(5.0, 1.75, 0.75);
         let mut locations = vec![];
@@ -390,6 +403,7 @@ impl RunnerIn {
                 .spawn(Leaf::new().stem(Some(grid)))
                 .insert(locations.get(p as usize).unwrap().clone())
                 .insert(ScrollContext::new(grid_wrapper))
+                .insert(EvaluateCore::recursive())
                 .id(); // panel for game-card
             let score_label = tree
                 .spawn(Leaf::new().stem(Some(view)))
@@ -402,6 +416,7 @@ impl RunnerIn {
                         .bottom(stem().bottom()),
                 )
                 .insert(ScrollContext::new(grid_wrapper))
+                .insert(EvaluateCore::recursive())
                 .id(); // text
             let finished_signal = tree
                 .spawn(Leaf::new().stem(Some(view)))
@@ -414,18 +429,19 @@ impl RunnerIn {
                         .height((element_label - 4).px())
                         .bottom(stem().bottom() - 4.px()),
                 )
+                .insert(EvaluateCore::recursive())
                 .id(); // circle-panel color-changing
             let g = tree
                 .spawn(Leaf::new().stem(Some(view)).elevation(0))
                 .insert(
                     ResponsiveLocation::new()
                         .left(stem().left())
-                        .right(stem().right())
+                        .top(stem().top())
                         .width(canvas_size.0.px())
                         .height(canvas_size.1.px()),
                 )
                 .id(); // genome
-            tree.entity(view).insert(GenomeView {
+            tree.entity(g).insert(GenomeView {
                 score: score_label,
                 finished_signal,
                 genome: g,
@@ -443,7 +459,9 @@ impl RunnerIn {
                 .insert(Evaluation::default())
                 .insert(NetworkInput::default())
                 .insert(NetworkOutput::default())
-                .insert(reward);
+                .insert(reward)
+                .insert(Activations::default())
+                .insert(EvaluateCore::recursive());
             runner.population.push(g);
             runner.genome_id_gen += 1;
         }
@@ -482,6 +500,7 @@ impl RunnerIn {
         tree.insert_resource(ids);
     }
 }
+#[derive(Event)]
 pub(crate) struct RunnerOut {}
 impl RunnerOut {
     pub(crate) fn obs(
@@ -524,8 +543,15 @@ impl GameSpeedChange {
     pub(crate) fn decrement(trigger: Trigger<OnClick>, mut tree: Tree) {
         tree.trigger(GameSpeedChange(-1));
     }
-    pub(crate) fn obs(trigger: Trigger<Self>, mut game_speed: ResMut<GameSpeed>) {
+    pub(crate) fn obs(
+        trigger: Trigger<Self>,
+        mut game_speed: ResMut<GameSpeed>,
+        ids: Res<RunnerIds>,
+        mut tree: Tree,
+    ) {
         game_speed.speed = (game_speed.speed + trigger.event().0).clamp(1, 4);
+        tree.entity(ids.game_speed_label)
+            .insert(TextValue::new(format!("Speed: {}", game_speed.speed)));
     }
 }
 #[derive(Component, Copy, Clone)]
@@ -697,24 +723,6 @@ impl Process {
             }
             runner.species.remove(idx);
         }
-        let min_fitness = evaluations
-            .iter()
-            .map(|a| (a.0, *a.1))
-            .min_by(|a, b| a.1.fitness.partial_cmp(&b.1.fitness).unwrap())
-            .unwrap()
-            .1
-            .fitness;
-        let current_best = evaluations
-            .iter()
-            .map(|a| (a.0, *a.1))
-            .max_by(|a, b| a.1.fitness.partial_cmp(&b.1.fitness).unwrap())
-            .unwrap();
-        if current_best.1.fitness > runner.best.as_ref().unwrap().1.fitness {
-            runner
-                .best
-                .replace((genomes.get(current_best.0).unwrap().clone(), current_best.1));
-        }
-        let fitness_range = (current_best.1.fitness - min_fitness).max(1.0);
         for species in runner.species.iter_mut() {
             species.shared_fitness = 0.0;
             if species.members.is_empty() {
@@ -818,12 +826,19 @@ impl Process {
         tree.trigger(MaxDepthCheck {});
         // speciate
         tree.trigger(Speciate {});
+        let mut reevaluate = false;
         if runner.run_to {
             if runner.generation < runner.requested_generation {
-                tree.trigger(Evaluate {});
+                reevaluate = true;
             } else {
+                runner.requested_generation = runner.generation + 1;
                 runner.run_to = false;
             }
+        }
+        tree.trigger(UpdateGenerationText{});
+        tree.trigger(UpdateSpeciesCountText{});
+        if reevaluate {
+            tree.trigger(Evaluate {});
         }
     }
 }

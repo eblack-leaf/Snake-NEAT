@@ -16,6 +16,9 @@ use foliage::text::{FontSize, Text};
 use foliage::tree::Tree;
 use foliage::twig::{Branch, Twig};
 use foliage::{bevy_ecs, icon_handle};
+use crate::runner::{Evaluate, EvaluateGenome, GameSpeedChange, Process, RunnerIn, RunnerOut, StopGeneration, UpdateGenerationText, UpdateSpeciesCountText};
+use crate::runner::game::{ComputeReward, GameSpeed, MoveWithNetworkOutput, SetNetworkInput};
+use crate::runner::genome::{Activate, MaxDepthCheck};
 
 #[derive(Resource)]
 pub(crate) struct IdTable {
@@ -197,11 +200,25 @@ impl Branch for Overview {
                 id_table.section_lines.push(line);
             }
         }
+        tree.insert_resource(GameSpeed::new(1));
         tree.observe(SelectSection::obs);
         tree.observe(SectionIn::obs);
         tree.observe(SectionOut::obs);
         tree.observe(IntroIn::obs);
         tree.observe(IntroOut::obs);
+        tree.observe(RunnerIn::obs);
+        tree.observe(RunnerOut::obs);
+        tree.observe(GameSpeedChange::obs);
+        tree.observe(UpdateSpeciesCountText::obs);
+        tree.observe(UpdateGenerationText::obs);
+        tree.observe(Evaluate::obs);
+        tree.observe(EvaluateGenome::obs);
+        tree.observe(Process::obs);
+        tree.observe(SetNetworkInput::obs);
+        tree.observe(MoveWithNetworkOutput::obs);
+        tree.observe(ComputeReward::obs);
+        tree.observe(MaxDepthCheck::obs);
+        tree.observe(Activate::obs);
         tree.insert_resource(id_table);
         tree.insert_resource(CurrentSection { id: 1 });
         tree.trigger(SelectSection { id: 0 });

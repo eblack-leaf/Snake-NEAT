@@ -10,6 +10,7 @@ use foliage::opacity::Opacity;
 use foliage::panel::OutlineWeight;
 use foliage::time::OnEnd;
 use foliage::tree::{EcsExtension, Tree};
+use crate::runner::{RunnerIn, RunnerOut};
 
 #[derive(Event)]
 pub(crate) struct SectionIn {
@@ -26,6 +27,7 @@ impl SectionIn {
             0 => {
                 tree.trigger(IntroIn { root: section_root });
             }
+            7 => tree.trigger(RunnerIn { root: section_root }),
             _ => {}
         }
     }
@@ -62,6 +64,9 @@ impl SectionOut {
         match query.get(trigger.entity()).copied().unwrap().id {
             0 => {
                 tree.trigger(IntroOut {});
+            }
+            7 => {
+                tree.trigger(RunnerOut{});
             }
             _ => {}
         }
