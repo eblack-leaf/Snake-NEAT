@@ -1,17 +1,30 @@
+use crate::overview::{IconHandles, SECTION_OUT_END};
 use crate::runner::game::{Game, GameGrid, Running};
 use crate::runner::genome::{Evaluation, MaxDepthCheck, NetworkInput, NetworkOutput, Reward};
 use crate::runner::species::{Speciate, Species};
 use environment::Environment;
+use foliage::anim::Animation;
 use foliage::bevy_ecs;
 use foliage::bevy_ecs::component::Component;
 use foliage::bevy_ecs::entity::Entity;
 use foliage::bevy_ecs::prelude::{Event, Res, Trigger};
 use foliage::bevy_ecs::system::{Query, ResMut, Resource};
+use foliage::color::{Grey, Monochromatic, Orange};
+use foliage::coordinate::section::Section;
+use foliage::coordinate::LogicalContext;
+use foliage::grid::aspect::stem;
+use foliage::grid::responsive::evaluate::{ScrollContext, Scrollable};
+use foliage::grid::responsive::ResponsiveLocation;
+use foliage::grid::unit::TokenUnit;
 use foliage::grid::Grid;
 use foliage::interaction::OnClick;
-use foliage::leaf::Leaf;
-use foliage::text::TextValue;
-use foliage::tree::Tree;
+use foliage::leaf::{EvaluateCore, Leaf};
+use foliage::opacity::Opacity;
+use foliage::panel::{Panel, Rounding};
+use foliage::style::Coloring;
+use foliage::text::{FontSize, Text, TextValue};
+use foliage::tree::{EcsExtension, Tree};
+use foliage::twig::button::Button;
 use game::GameSpeed;
 use genome::Genome;
 use innovation::ExistingInnovation;
@@ -41,6 +54,7 @@ pub(crate) struct RunnerIds {
     pub(crate) species_label: Entity,
     pub(crate) evaluate: Entity,
     pub(crate) process: Entity,
+    pub(crate) grid_wrapper: Entity,
     pub(crate) grid: Entity,
     pub(crate) game_speed: Entity,
     pub(crate) game_speed_decrement: Entity,
@@ -49,7 +63,11 @@ pub(crate) struct RunnerIds {
     pub(crate) expanded_view: Entity,
 }
 impl RunnerIn {
-    pub(crate) fn obs(trigger: Trigger<Self>, mut tree: Tree) {
+    pub(crate) fn obs(
+        trigger: Trigger<Self>,
+        mut tree: Tree,
+        sections: Query<&Section<LogicalContext>>,
+    ) {
         let mut environment = Environment::new();
         environment.population_count = 150;
         environment.input_size = 6;
@@ -68,34 +86,126 @@ impl RunnerIn {
         environment.connection_weight = 0.8;
         environment.perturb = 0.9;
         environment.max_turns = 500;
+        tree.start_sequence(|seq| {
+            seq.animate(
+                Animation::new(Opacity::new(1.0))
+                    .start(SECTION_OUT_END + 100)
+                    .end(SECTION_OUT_END + 400)
+                    .targeting(trigger.event().root),
+            );
+        });
         let root = tree
-            .spawn(Leaf::new().stem(Some(trigger.event().root)))
+            .spawn(Leaf::new().stem(Some(trigger.event().root)).elevation(-1))
+            .insert(
+                ResponsiveLocation::new()
+                    .left(stem().left())
+                    .right(stem().right())
+                    .top(stem().top())
+                    .bottom(stem().bottom()),
+            )
+            .insert(EvaluateCore::recursive())
             .id();
-        let gen = tree.spawn(Leaf::new().stem(Some(root)).elevation(-1)).id();
-        let gen_text = tree.spawn(Leaf::new().stem(Some(gen)).elevation(0)).id();
-        let gen_increment = tree.spawn(Leaf::new().stem(Some(gen)).elevation(0)).id();
-        let gen_run_to = tree.spawn(Leaf::new().stem(Some(gen)).elevation(0)).id();
-        let population_label = tree.spawn(Leaf::new().stem(Some(root)).elevation(-1)).id();
-        let species_label = tree.spawn(Leaf::new().stem(Some(root)).elevation(-1)).id();
-        let evaluate = tree.spawn(Leaf::new().stem(Some(root)).elevation(-1)).id();
-        let process = tree.spawn(Leaf::new().stem(Some(root)).elevation(-1)).id();
-        let num_columns = 8;
-        let num_rows = (environment.population_count / 8).max(1) as u32;
-        let element_size = (300, 150);
-        let view_size = (element_size.0 * num_columns, element_size.1 * num_rows);
-        let grid = tree
-            .spawn(Leaf::new().stem(Some(root)).elevation(0))
-            .insert(Grid::new(num_columns, num_rows).gap((4, 4)))
+        let gen = tree
+            .spawn(Leaf::new().stem(Some(root)).elevation(-1))
+            .insert(EvaluateCore::recursive())
             .id();
+        let gen_text = tree
+            .spawn(Leaf::new().stem(Some(gen)).elevation(0))
+            .insert(Text::new(
+                "Gen: 0 -> 1",
+                FontSize::new(14),
+                Grey::plus_two(),
+            ))
+            .insert(EvaluateCore::recursive())
+            .id();
+        let gen_increment = tree
+            .spawn(Leaf::new().stem(Some(gen)).elevation(0))
+            .insert(
+                Button::new(
+                    IconHandles::Check,
+                    Coloring::new(Grey::plus_two(), Grey::minus_two()),
+                )
+                .circle(),
+            )
+            .observe(IncrementGeneration::obs)
+            .insert(EvaluateCore::recursive())
+            .id();
+        let gen_run_to = tree
+            .spawn(Leaf::new().stem(Some(gen)).elevation(0))
+            .insert(
+                Button::new(
+                    IconHandles::Check,
+                    Coloring::new(Grey::minus_two(), Grey::plus_two()),
+                )
+                .circle(),
+            )
+            .observe(RunToGeneration::obs)
+            .id();
+        let population_label = tree
+            .spawn(Leaf::new().stem(Some(root)).elevation(-1))
+            .insert(Text::new(
+                "Population: 0",
+                FontSize::new(14),
+                Grey::plus_two(),
+            ))
+            .id();
+        let species_label = tree
+            .spawn(Leaf::new().stem(Some(root)).elevation(-1))
+            .insert(Text::new(
+                "Species: 0",
+                FontSize::new(14),
+                Grey::minus_two(),
+            ))
+            .id();
+        let evaluate = tree
+            .spawn(Leaf::new().stem(Some(root)).elevation(-1))
+            .insert(
+                Button::new(
+                    IconHandles::Check,
+                    Coloring::new(Grey::minus_two(), Grey::plus_two()),
+                )
+                .with_text("evaluate", FontSize::new(14)),
+            )
+            .observe(EvaluateWrapper::obs)
+            .id();
+        let process = tree
+            .spawn(Leaf::new().stem(Some(root)).elevation(-1))
+            .insert(
+                Button::new(
+                    IconHandles::Check,
+                    Coloring::new(Grey::minus_two(), Grey::plus_two()),
+                )
+                .with_text("process", FontSize::new(14)),
+            )
+            .observe(ProcessWrapper::obs)
+            .id();
+        let side = 150;
         let game_speed = tree.spawn(Leaf::new().stem(Some(root)).elevation(-1)).id();
         let game_speed_decrement = tree
             .spawn(Leaf::new().stem(Some(game_speed)).elevation(0))
+            .insert(
+                Button::new(
+                    IconHandles::Check,
+                    Coloring::new(Grey::minus_two(), Grey::minus_two()),
+                )
+                .circle(),
+            )
+            .observe(GameSpeedChange::decrement)
             .id();
         let game_speed_label = tree
             .spawn(Leaf::new().stem(Some(game_speed)).elevation(0))
+            .insert(Text::new("Speed: 1", FontSize::new(14), Grey::plus_two()))
             .id();
         let game_speed_increment = tree
             .spawn(Leaf::new().stem(Some(game_speed)).elevation(0))
+            .insert(
+                Button::new(
+                    IconHandles::Check,
+                    Coloring::new(Grey::minus_two(), Grey::minus_two()),
+                )
+                .circle(),
+            )
+            .observe(GameSpeedChange::increment)
             .id();
         tree.insert_resource(GameSpeed::new(1));
         let game_grid = GameGrid::new(60, 30);
@@ -111,13 +221,63 @@ impl RunnerIn {
             finished: environment.population_count,
             game_grid,
         };
+        let main = sections.get(trigger.event().root).unwrap().width() as i32 - side;
+        let element_size = (300, 150);
+        let num_columns = main / element_size.0;
+        let num_rows = (environment.population_count / num_columns).max(1);
+        let view_size = (num_columns * element_size.0, num_rows * element_size.1);
+        let grid_wrapper = tree
+            .spawn(Leaf::new().stem(Some(root)).elevation(0))
+            .insert(
+                ResponsiveLocation::new()
+                    .left(stem().left() + side.px())
+                    .width(main.px())
+                    .top(stem().top())
+                    .bottom(stem().bottom()),
+            )
+            .insert(Scrollable::new())
+            .id();
+        let grid = tree
+            .spawn(Leaf::new().stem(Some(root)).elevation(0))
+            .insert(Grid::new(num_columns as u32, num_rows as u32).gap((8, 4)))
+            .insert(
+                ResponsiveLocation::new()
+                    .left(stem().left())
+                    .width(view_size.0.px())
+                    .height(view_size.1.px())
+                    .top(stem().top()),
+            )
+            .insert(ScrollContext::new(grid_wrapper))
+            .id();
         let reward = Reward::new(5.0, 1.75, 0.75);
-        let expanded_view = tree.spawn(Leaf::new().stem(Some(root)).elevation(-1)).id();
-        // TODO elements of expanded-view (game, network, score-label, finished-signal, switch-view)
+        let mut locations = vec![];
+        for c in 0..num_columns {
+            for r in 0..num_rows {
+                locations.push(
+                    ResponsiveLocation::new()
+                        .left(c.column().begin().of(stem()))
+                        .right(c.column().end().of(stem()))
+                        .top(r.row().begin().of(stem()))
+                        .bottom(r.row().end().of(stem())),
+                );
+            }
+        }
         for p in 0..environment.population_count {
-            let view = tree.spawn(Leaf::new().stem(Some(grid))).id(); // panel for game-card
-            let score_label = tree.spawn(Leaf::new().stem(Some(view))).id(); // text
-            let finished_signal = tree.spawn(Leaf::new().stem(Some(view))).id(); // circle-panel color-changing
+            let view = tree
+                .spawn(Leaf::new().stem(Some(grid)))
+                .insert(locations.get(p as usize).unwrap().clone())
+                .insert(ScrollContext::new(grid_wrapper))
+                .id(); // panel for game-card
+            let score_label = tree
+                .spawn(Leaf::new().stem(Some(view)))
+                .insert(Text::new("Score: 0", FontSize::new(12), Grey::plus_two()))
+                .insert(ScrollContext::new(grid_wrapper))
+                .id(); // text
+            let finished_signal = tree
+                .spawn(Leaf::new().stem(Some(view)))
+                .insert(Panel::new(Rounding::all(1.0), Orange::base()))
+                .insert(ScrollContext::new(grid_wrapper))
+                .id(); // circle-panel color-changing
             let g = tree.spawn(Leaf::new().stem(Some(view)).elevation(0)).id(); // genome
             tree.entity(view).insert(GenomeView {
                 score: score_label,
@@ -130,7 +290,7 @@ impl RunnerIn {
                 environment.output_size,
             );
             tree.entity(g).insert(genome);
-            let game = Game::new(&mut tree, g, game_grid);
+            let game = Game::new(&mut tree, grid_wrapper, g, game_grid);
             tree.entity(g)
                 .insert(game)
                 .insert(Running(false))
@@ -141,6 +301,8 @@ impl RunnerIn {
             runner.population.push(g);
             runner.genome_id_gen += 1;
         }
+        let expanded_view = tree.spawn(Leaf::new().stem(Some(root)).elevation(-1)).id();
+        // TODO elements of expanded-view (game, network, score-label, finished-signal, switch-view)
         runner.best.replace((
             Genome::new(0, environment.input_size, environment.output_size),
             Evaluation::default(),
@@ -161,6 +323,7 @@ impl RunnerIn {
             species_label,
             evaluate,
             process,
+            grid_wrapper,
             grid,
             game_speed,
             game_speed_decrement,
@@ -203,6 +366,19 @@ pub(crate) struct Runner {
     pub(crate) finished: i32,
     pub(crate) game_grid: GameGrid,
 }
+#[derive(Event)]
+pub(crate) struct GameSpeedChange(pub(crate) i32);
+impl GameSpeedChange {
+    pub(crate) fn increment(trigger: Trigger<OnClick>, mut tree: Tree) {
+        tree.trigger(GameSpeedChange(1));
+    }
+    pub(crate) fn decrement(trigger: Trigger<OnClick>, mut tree: Tree) {
+        tree.trigger(GameSpeedChange(-1));
+    }
+    pub(crate) fn obs(trigger: Trigger<Self>, mut game_speed: ResMut<GameSpeed>) {
+        game_speed.speed = (game_speed.speed + trigger.event().0).clamp(1, 4);
+    }
+}
 #[derive(Component, Copy, Clone)]
 pub(crate) struct GenomeView {
     pub(crate) score: Entity,
@@ -242,7 +418,7 @@ impl UpdateGenerationText {
 #[derive(Event)]
 pub(crate) struct IncrementGeneration {}
 impl IncrementGeneration {
-    pub(crate) fn obs(trigger: Trigger<Self>, mut tree: Tree, mut runner: ResMut<Runner>) {
+    pub(crate) fn obs(trigger: Trigger<OnClick>, mut tree: Tree, mut runner: ResMut<Runner>) {
         runner.requested_generation += 1;
         tree.trigger(UpdateGenerationText {});
     }
@@ -250,7 +426,7 @@ impl IncrementGeneration {
 #[derive(Event)]
 pub(crate) struct RunToGeneration {}
 impl RunToGeneration {
-    pub(crate) fn obs(trigger: Trigger<Self>, mut runner: ResMut<Runner>, mut tree: Tree) {
+    pub(crate) fn obs(trigger: Trigger<OnClick>, mut runner: ResMut<Runner>, mut tree: Tree) {
         runner.run_to = true;
         tree.trigger(Evaluate {});
     }
@@ -269,6 +445,13 @@ impl SelectGenome {
     }
 }
 #[derive(Event)]
+pub(crate) struct EvaluateWrapper {}
+impl EvaluateWrapper {
+    pub(crate) fn obs(trigger: Trigger<OnClick>, mut tree: Tree) {
+        tree.trigger(Evaluate {});
+    }
+}
+#[derive(Event)]
 pub(crate) struct Evaluate {}
 impl Evaluate {
     pub(crate) fn obs(trigger: Trigger<Self>, mut tree: Tree, runner: ResMut<Runner>) {
@@ -281,13 +464,25 @@ impl Evaluate {
 #[derive(Event)]
 pub(crate) struct EvaluateGenome {}
 impl EvaluateGenome {
-    pub(crate) fn obs(trigger: Trigger<Self>, mut tree: Tree, mut runner: ResMut<Runner>) {
+    pub(crate) fn obs(
+        trigger: Trigger<Self>,
+        mut tree: Tree,
+        mut runner: ResMut<Runner>,
+        ids: Res<RunnerIds>,
+    ) {
         let genome = trigger.entity();
         tree.entity(genome).insert(Evaluation::default());
-        let game = Game::new(&mut tree, genome, runner.game_grid);
+        let game = Game::new(&mut tree, ids.grid_wrapper, genome, runner.game_grid);
         tree.entity(genome).insert(game);
         tree.entity(genome).insert(Running(true));
         runner.finished = (runner.finished - 1).max(0);
+    }
+}
+#[derive(Event)]
+pub(crate) struct ProcessWrapper {}
+impl ProcessWrapper {
+    pub(crate) fn obs(trigger: Trigger<OnClick>, mut tree: Tree) {
+        tree.trigger(Process {});
     }
 }
 #[derive(Event)]

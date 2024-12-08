@@ -7,9 +7,7 @@ use crate::overview::Overview;
 use foliage::tree::EcsExtension;
 use foliage::twig::Twig;
 use foliage::Foliage;
-use runner::environment::Environment;
-
-const VIEW_AREA: (f32, f32) = (1600.0, 800.0);
+use overview::VIEW_AREA;
 fn main() {
     let mut foliage = Foliage::new();
     foliage.set_desktop_size(VIEW_AREA);

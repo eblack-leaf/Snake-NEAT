@@ -71,7 +71,7 @@ impl GameGrid {
 
 impl Game {
     pub(crate) const STARTING_SEGMENTS: i32 = 6;
-    pub(crate) fn new(tree: &mut Tree, g: Entity, game_grid: GameGrid) -> Self {
+    pub(crate) fn new(tree: &mut Tree, wrapper: Entity, g: Entity, game_grid: GameGrid) -> Self {
         let mut snake = Snake {
             segments: vec![],
             direction: Direction::Right,

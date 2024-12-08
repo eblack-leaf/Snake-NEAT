@@ -207,3 +207,5 @@ impl Branch for Overview {
         tree.trigger(SelectSection { id: 0 });
     }
 }
+
+pub(crate) const VIEW_AREA: (f32, f32) = (1600.0, 800.0);
