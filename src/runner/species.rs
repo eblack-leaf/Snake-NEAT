@@ -2,7 +2,7 @@ use crate::runner::compatibility::Compatibility;
 use crate::runner::environment::Environment;
 use crate::runner::genome::Genome;
 use crate::runner::node::Node;
-use crate::runner::{Fitness, Generation, Runner, SpeciesId};
+use crate::runner::{Fitness, Generation, Runner, SpeciesId, UpdateSpeciesCountText};
 use foliage::bevy_ecs;
 use foliage::bevy_ecs::change_detection::Res;
 use foliage::bevy_ecs::component::Component;
@@ -144,5 +144,6 @@ impl Speciate {
         for idx in empty {
             runner.species.remove(idx);
         }
+        tree.trigger(UpdateSpeciesCountText {});
     }
 }

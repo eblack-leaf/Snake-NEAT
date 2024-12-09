@@ -114,7 +114,7 @@ impl Game {
             segments: vec![],
             direction: Direction::Right,
         };
-        let start = Location::new(20, 15);
+        let start = Location::new(game_grid.grid.0 / 2 - 5, game_grid.grid.1 / 2);
         for s in 0..Self::STARTING_SEGMENTS {
             let mut location = Location::default();
             location.x = start.x - s;
@@ -134,7 +134,7 @@ impl Game {
                 .id();
             snake.segments.push(Segment { panel, location });
         }
-        let location = Location::new(40, 15);
+        let location = Location::new(game_grid.grid.0 / 2 + 5, game_grid.grid.1 / 2);
         let food = Segment {
             panel: tree
                 .spawn(Leaf::new().stem(Some(canvas)).elevation(-1))
@@ -149,7 +149,7 @@ impl Game {
                 // .insert(ScrollContext::new(wrapper))
                 .insert(EvaluateCore::recursive())
                 .id(),
-            location: Location::default(),
+            location,
         };
         let last = snake.segments.last().as_ref().unwrap().location;
         Self {
@@ -253,9 +253,9 @@ impl SetNetworkInput {
             .iter()
             .map(|n| Game::distance(*n, game.food.location))
             .collect::<Vec<_>>();
-        println!("intersect: {:?}", neighbor_intersects_tail);
-        println!("neighbors: {:?}", neighbors);
-        println!("head: {:?}", head);
+        // println!("intersect: {:?}", neighbor_intersects_tail);
+        // println!("neighbors: {:?}", neighbors);
+        // println!("head: {:?}", head);
         let to_food = Location::new(game.food.location.x - head.x, game.food.location.y - head.y);
         match game.snake.direction {
             Direction::Left => {
@@ -599,7 +599,6 @@ impl ComputeReward {
         mut evaluations: Query<(Entity, &mut Evaluation)>,
         genomes: Query<&Genome>,
         views: Query<&GenomeView>,
-        mut texts: Query<&mut TextValue>,
         ids: Res<RunnerIds>,
     ) {
         let (_, mut eval) = evaluations.get_mut(trigger.entity()).unwrap();
@@ -620,7 +619,8 @@ impl ComputeReward {
             )));
         }
         eval.fitness += reward.value();
-        texts.get_mut(view.score).unwrap().0 = format!("Score: {}", eval.fitness);
+        tree.entity(view.score)
+            .insert(TextValue::new(format!("Score: {}", eval.fitness)));
         drop(eval);
         if runner.finished == environment.population_count {
             // give info to best

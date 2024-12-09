@@ -146,7 +146,7 @@ impl RunnerIn {
             )
             .insert(
                 ResponsiveLocation::new()
-                    .left(stem().left())
+                    .left(stem().left() + 8.px())
                     .width(button_size.px())
                     .top(50.percent().height().from(stem()) + 8.px())
                     .height(button_size.px()),
@@ -165,7 +165,7 @@ impl RunnerIn {
             )
             .insert(
                 ResponsiveLocation::new()
-                    .left(stem().left() + button_size.px() + 8.px())
+                    .left(stem().left() + button_size.px() + 16.px())
                     .width(button_size.px())
                     .top(50.percent().height().from(stem()) + 8.px())
                     .height(button_size.px()),
@@ -184,7 +184,7 @@ impl RunnerIn {
             )
             .insert(
                 ResponsiveLocation::new()
-                    .left(stem().left() + (button_size * 2).px() + 16.px())
+                    .left(stem().left() + (button_size * 2).px() + 24.px())
                     .width(button_size.px())
                     .top(50.percent().height().from(stem()) + 8.px())
                     .height(button_size.px()),
@@ -242,7 +242,8 @@ impl RunnerIn {
                     IconHandles::Check,
                     Coloring::new(Grey::minus_two(), Grey::plus_two()),
                 )
-                .with_text("evaluate", FontSize::new(14)),
+                .with_text("evaluate", FontSize::new(14))
+                .rounded(Rounding::all(0.2)),
             )
             .insert(
                 ResponsiveLocation::new()
@@ -261,7 +262,8 @@ impl RunnerIn {
                     IconHandles::Check,
                     Coloring::new(Grey::minus_two(), Grey::plus_two()),
                 )
-                .with_text("process", FontSize::new(14)),
+                .with_text("process", FontSize::new(14))
+                .rounded(Rounding::all(0.2)),
             )
             .insert(
                 ResponsiveLocation::new()
@@ -297,7 +299,7 @@ impl RunnerIn {
                 ResponsiveLocation::new()
                     .left(stem().left() + 8.px())
                     .width(button_size.px())
-                    .top(50.percent().height().from(stem()))
+                    .top(stem().top())
                     .height(button_size.px()),
             )
             .observe(GameSpeedChange::decrement)
@@ -328,14 +330,15 @@ impl RunnerIn {
                 ResponsiveLocation::new()
                     .right(stem().right() - 8.px())
                     .width(button_size.px())
-                    .top(50.percent().height().from(stem()))
+                    .top(stem().top())
                     .height(button_size.px()),
             )
             .observe(GameSpeedChange::increment)
             .insert(EvaluateCore::recursive())
             .id();
         tree.insert_resource(GameSpeed::new(1));
-        let game_grid = GameGrid::new(60, 30);
+        let game_grid = GameGrid::new(30, 30);
+        let best_evaluator = tree.spawn(Leaf::new().stem(Some(root)).elevation(-1)).id();
         let mut runner = Runner {
             population: vec![],
             species: vec![],
@@ -343,6 +346,7 @@ impl RunnerIn {
             requested_generation: 1,
             run_to: false,
             best: None,
+            best_evaluator,
             species_id_gen: 0,
             genome_id_gen: 0,
             finished: environment.population_count,
@@ -350,11 +354,16 @@ impl RunnerIn {
             canvas_size: (0, 0),
         };
         let main = VIEW_AREA.0 as i32 - SIDE_PANEL_WIDTH as i32 - side;
-        let element_label = 20;
-        let element_size = (200, 100 + element_label);
-        let num_columns = main / (element_size.0 + 16);
-        let num_rows = (environment.population_count / num_columns).max(1) + 1;
-        let view_size = (num_columns * element_size.0, num_rows * element_size.1);
+        let element_label = 24;
+        let element_size = (100, 100 + element_label);
+        let num_columns = main / (element_size.0 + 8);
+        let num_rows = (environment.population_count as f32 / num_columns as f32)
+            .ceil()
+            .max(1.0) as i32;
+        let view_size = (
+            num_columns * element_size.0,
+            (num_rows + 1) * element_size.1,
+        );
         let canvas_size = (element_size.0, element_size.1 - element_label);
         runner.canvas_size = canvas_size;
         let grid_wrapper = tree
@@ -371,7 +380,7 @@ impl RunnerIn {
             .id();
         let grid = tree
             .spawn(Leaf::new().stem(Some(grid_wrapper)).elevation(0))
-            .insert(Grid::new(num_columns as u32, num_rows as u32).gap((8, 4)))
+            .insert(Grid::new(num_columns as u32, (num_rows + 1) as u32).gap((8, 8)))
             .insert(
                 ResponsiveLocation::new()
                     .left(stem().left())
@@ -384,8 +393,8 @@ impl RunnerIn {
             .id();
         let reward = Reward::new(5.0, 1.75, 0.75);
         let mut locations = vec![];
-        for c in 0..num_columns {
-            for r in 0..num_rows {
+        for r in 0..num_rows {
+            for c in 0..num_columns {
                 let c = c + 1;
                 let r = r + 1;
                 locations.push(
@@ -406,7 +415,7 @@ impl RunnerIn {
                 .id(); // panel for game-card
             let score_label = tree
                 .spawn(Leaf::new().stem(Some(view)).elevation(-1))
-                .insert(Text::new("Score: 0", FontSize::new(12), Grey::plus_two()))
+                .insert(Text::new("Score: 0", FontSize::new(10), Grey::plus_two()))
                 .insert(
                     ResponsiveLocation::new()
                         .left(stem().left())
@@ -423,10 +432,10 @@ impl RunnerIn {
                 // .insert(ScrollContext::new(grid_wrapper))
                 .insert(
                     ResponsiveLocation::new()
-                        .left(stem().left() + 116.px())
-                        .width((element_label - 4).px())
-                        .height((element_label - 4).px())
-                        .bottom(stem().bottom() - 4.px()),
+                        .left(stem().left() + 80.px())
+                        .width(8.px())
+                        .height(8.px())
+                        .bottom(stem().bottom() - 8.px()),
                 )
                 .insert(EvaluateCore::recursive())
                 .id(); // circle-panel color-changing
@@ -528,6 +537,7 @@ pub(crate) struct Runner {
     pub(crate) requested_generation: Generation,
     pub(crate) run_to: bool,
     pub(crate) best: Option<(Genome, Evaluation)>,
+    pub(crate) best_evaluator: Entity,
     pub(crate) species_id_gen: SpeciesId,
     pub(crate) genome_id_gen: GenomeId,
     pub(crate) finished: i32,
@@ -673,7 +683,7 @@ impl AddGame {
     pub(crate) fn obs(
         trigger: Trigger<Self>,
         mut tree: Tree,
-        mut runner: ResMut<Runner>,
+        runner: Res<Runner>,
         ids: Res<RunnerIds>,
     ) {
         let genome = trigger.entity();
@@ -759,14 +769,32 @@ impl Process {
             species.percent_total = species.shared_fitness / total_fitness;
         }
         let mut next_gen = vec![];
-        let mut remaining = environment.population_count as usize;
+        let mut remaining = environment.population_count as f32;
         let mut next_gen_id = 0;
+        let best_id = runner.best.as_ref().unwrap().0.id;
         for species in runner.species.iter_mut() {
             let mut offspring_count =
                 (species.percent_total * environment.population_count as f32).floor();
-            remaining -= offspring_count as usize;
-            if remaining <= 0 {
-                offspring_count += remaining as f32;
+            remaining -= offspring_count;
+            if remaining <= 0.0 {
+                offspring_count += remaining;
+            }
+            if offspring_count >= 1.0 {
+                if let Some(idx) = species
+                    .members
+                    .iter()
+                    .map(|m| genomes.get(*m).unwrap().id)
+                    .position(|i| i == best_id)
+                {
+                    offspring_count -= 1.0;
+                    let mut best = genomes
+                        .get(*species.members.get(idx).unwrap())
+                        .cloned()
+                        .unwrap();
+                    best.id = next_gen_id;
+                    next_gen_id += 1;
+                    next_gen.push(best);
+                }
             }
             let only_mutate = (offspring_count * environment.only_mutate).floor();
             let to_crossover = offspring_count - only_mutate;
@@ -835,8 +863,17 @@ impl Process {
                 next_gen.push(crossover);
             }
         }
+        if runner.population.len() != next_gen.len() {
+            println!(
+                "pop: {} next-gen: {}",
+                runner.population.len(),
+                next_gen.len()
+            );
+        }
         for (i, next) in next_gen.drain(..).enumerate() {
-            tree.entity(*runner.population.get(i).unwrap()).insert(next);
+            if let Some(entity) = runner.population.get(i) {
+                tree.entity(*entity).insert(next);
+            }
         }
         runner.generation += 1;
         // max-depth

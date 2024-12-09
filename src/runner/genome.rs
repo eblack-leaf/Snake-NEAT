@@ -277,8 +277,8 @@ impl Activate {
                 _ => panic!("no-channel"),
             }
         }
-        println!("activations: {:?}", activations);
-        println!("outputs: {:?}", output);
+        // println!("activations: {:?}", activations);
+        // println!("outputs: {:?}", output);
         storage.get_mut(trigger.entity()).unwrap().values = activations;
     }
 }
