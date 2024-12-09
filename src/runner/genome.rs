@@ -124,7 +124,7 @@ impl NetworkInput {
         }
     }
 }
-#[derive(Component, Default)]
+#[derive(Component, Default, Debug)]
 pub(crate) struct NetworkOutput {
     pub(crate) move_left: bool,
     pub(crate) move_right: bool,
@@ -272,11 +272,13 @@ impl Activate {
         let mut output = outputs.get_mut(trigger.entity()).unwrap();
         for out in environment.input_size..environment.input_size + environment.output_size {
             match out - environment.input_size {
-                0 => output.move_left = *activations.get(0).unwrap() >= 0.5,
-                1 => output.move_right = *activations.get(1).unwrap() >= 0.5,
+                0 => output.move_left = *activations.get(out).unwrap() > 0.5,
+                1 => output.move_right = *activations.get(out).unwrap() > 0.5,
                 _ => panic!("no-channel"),
             }
         }
+        println!("activations: {:?}", activations);
+        println!("outputs: {:?}", output);
         storage.get_mut(trigger.entity()).unwrap().values = activations;
     }
 }

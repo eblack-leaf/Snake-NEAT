@@ -76,7 +76,7 @@ pub(crate) struct RunnerIds {
 impl RunnerIn {
     pub(crate) fn obs(trigger: Trigger<Self>, mut tree: Tree) {
         let mut environment = Environment::new();
-        environment.population_count = 150;
+        environment.population_count = 1;
         environment.input_size = 6;
         environment.output_size = 2;
         environment.compatibility_factors.c1 = 1.0;
