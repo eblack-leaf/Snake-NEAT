@@ -22,7 +22,7 @@ use foliage::leaf::{EvaluateCore, Leaf};
 use foliage::opacity::Opacity;
 use foliage::panel::{Panel, Rounding};
 use foliage::style::Coloring;
-use foliage::text::{FontSize, Text, TextValue};
+use foliage::text::{FontSize, HorizontalAlignment, Text, TextValue};
 use foliage::tree::{EcsExtension, Tree};
 use foliage::twig::button::Button;
 use foliage::{bevy_ecs, Root};
@@ -139,14 +139,14 @@ impl RunnerIn {
             .spawn(Leaf::new().stem(Some(gen)).elevation(0))
             .insert(
                 Button::new(
-                    IconHandles::Check,
-                    Coloring::new(Grey::plus_two(), Grey::minus_two()),
+                    IconHandles::Right,
+                    Coloring::new(Grey::plus_two(), Grey::minus_three()),
                 )
                 .circle(),
             )
             .insert(
                 ResponsiveLocation::new()
-                    .left(stem().left() + 8.px())
+                    .left(stem().left() + 32.px())
                     .width(button_size.px())
                     .top(50.percent().height().from(stem()) + 8.px())
                     .height(button_size.px()),
@@ -158,14 +158,14 @@ impl RunnerIn {
             .spawn(Leaf::new().stem(Some(gen)).elevation(0))
             .insert(
                 Button::new(
-                    IconHandles::Check,
-                    Coloring::new(Grey::plus_two(), Grey::minus_two()),
+                    IconHandles::Play,
+                    Coloring::new(Grey::plus_two(), Grey::minus_three()),
                 )
                 .circle(),
             )
             .insert(
                 ResponsiveLocation::new()
-                    .left(stem().left() + button_size.px() + 16.px())
+                    .left(stem().left() + button_size.px() + 40.px())
                     .width(button_size.px())
                     .top(50.percent().height().from(stem()) + 8.px())
                     .height(button_size.px()),
@@ -177,14 +177,14 @@ impl RunnerIn {
             .spawn(Leaf::new().stem(Some(gen)).elevation(0))
             .insert(
                 Button::new(
-                    IconHandles::Check,
-                    Coloring::new(Grey::plus_two(), Grey::minus_two()),
+                    IconHandles::Stop,
+                    Coloring::new(Grey::plus_two(), Grey::minus_three()),
                 )
                 .circle(),
             )
             .insert(
                 ResponsiveLocation::new()
-                    .left(stem().left() + (button_size * 2).px() + 24.px())
+                    .left(stem().left() + (button_size * 2).px() + 48.px())
                     .width(button_size.px())
                     .top(50.percent().height().from(stem()) + 8.px())
                     .height(button_size.px()),
@@ -239,7 +239,7 @@ impl RunnerIn {
             .spawn(Leaf::new().stem(Some(root)).elevation(-1))
             .insert(
                 Button::new(
-                    IconHandles::Check,
+                    IconHandles::Play,
                     Coloring::new(Grey::minus_two(), Grey::plus_two()),
                 )
                 .with_text("evaluate", FontSize::new(14))
@@ -249,7 +249,7 @@ impl RunnerIn {
                 ResponsiveLocation::new()
                     .left(stem().left() + 8.px())
                     .width(side.px() - 16.px())
-                    .height(7.percent().height().of(stem()))
+                    .height(40.px())
                     .top(40.percent().height().from(stem())),
             )
             .observe(EvaluateWrapper::obs)
@@ -259,7 +259,7 @@ impl RunnerIn {
             .spawn(Leaf::new().stem(Some(root)).elevation(-1))
             .insert(
                 Button::new(
-                    IconHandles::Check,
+                    IconHandles::Play,
                     Coloring::new(Grey::minus_two(), Grey::plus_two()),
                 )
                 .with_text("process", FontSize::new(14))
@@ -269,7 +269,7 @@ impl RunnerIn {
                 ResponsiveLocation::new()
                     .left(stem().left() + 8.px())
                     .width(side.px() - 16.px())
-                    .height(7.percent().height().of(stem()))
+                    .height(40.px())
                     .top(50.percent().height().from(stem())),
             )
             .observe(ProcessWrapper::obs)
@@ -290,8 +290,8 @@ impl RunnerIn {
             .spawn(Leaf::new().stem(Some(game_speed)).elevation(0))
             .insert(
                 Button::new(
-                    IconHandles::Check,
-                    Coloring::new(Grey::plus_two(), Grey::minus_two()),
+                    IconHandles::Left,
+                    Coloring::new(Grey::plus_two(), Grey::minus_three()),
                 )
                 .circle(),
             )
@@ -313,7 +313,7 @@ impl RunnerIn {
                     .left(stem().left())
                     .right(stem().right())
                     .top(stem().top())
-                    .bottom(50.percent().height().from(stem())),
+                    .height(button_size.px()),
             )
             .insert(EvaluateCore::recursive())
             .id();
@@ -321,8 +321,8 @@ impl RunnerIn {
             .spawn(Leaf::new().stem(Some(game_speed)).elevation(0))
             .insert(
                 Button::new(
-                    IconHandles::Check,
-                    Coloring::new(Grey::plus_two(), Grey::minus_two()),
+                    IconHandles::Right,
+                    Coloring::new(Grey::plus_two(), Grey::minus_three()),
                 )
                 .circle(),
             )
@@ -771,7 +771,10 @@ impl Process {
         let mut next_gen = vec![];
         let mut remaining = environment.population_count as f32;
         let mut next_gen_id = 0;
-        let best_id = runner.best.as_ref().unwrap().0.id;
+        let best_id = runner.population.iter().max_by(|a, b| {
+            evaluations.get(**a).unwrap().1.fitness.partial_cmp(&evaluations.get(**b).unwrap().1.fitness).unwrap()
+        }).unwrap();
+        let best_id = genomes.get(*best_id).unwrap().id;
         for species in runner.species.iter_mut() {
             let mut offspring_count =
                 (species.percent_total * environment.population_count as f32).floor();

@@ -51,6 +51,8 @@ pub(crate) struct Overview {}
 #[icon_handle]
 pub(crate) enum IconHandles {
     Check,
+    Table,
+    Left, Right, Stop, Play
 }
 pub(crate) const NUM_SECTIONS: usize = 8;
 pub(crate) const SELECTOR_DIM: u32 = 32;
@@ -75,6 +77,26 @@ impl Branch for Overview {
         tree.spawn(IconRequest::new(
             IconHandles::Check,
             include_bytes!("assets/check.icon").to_vec(),
+        ));
+        tree.spawn(IconRequest::new(
+            IconHandles::Table,
+            include_bytes!("assets/table.icon").to_vec(),
+        ));
+        tree.spawn(IconRequest::new(
+            IconHandles::Left,
+            include_bytes!("assets/chevron-left.icon").to_vec(),
+        ));
+        tree.spawn(IconRequest::new(
+            IconHandles::Right,
+            include_bytes!("assets/chevron-right.icon").to_vec(),
+        ));
+        tree.spawn(IconRequest::new(
+            IconHandles::Stop,
+            include_bytes!("assets/stop-circle.icon").to_vec(),
+        ));
+        tree.spawn(IconRequest::new(
+            IconHandles::Play,
+            include_bytes!("assets/play.icon").to_vec(),
         ));
         let view_location = ResponsiveLocation::new()
             .left(SIDE_PANEL_WIDTH.px())
@@ -156,7 +178,7 @@ impl Branch for Overview {
                 _ => {}
             };
             id_table.section_buttons.push(panel);
-            let icon = Icon::new(IconHandles::Check, Grey::base());
+            let icon = Icon::new(IconHandles::Table, Grey::base());
             let next_layer_y = y + (SELECTOR_DIM as f32) + 8.0;
             let icon_location = ResponsiveLocation::new()
                 .left(16.px())
