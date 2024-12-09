@@ -531,6 +531,7 @@ impl MoveWithNetworkOutput {
         for seg in game.snake.segments.iter_mut() {
             new_segment_locations.push(seg.location);
         }
+        game.collected_food = false;
         if new_head == game.food.location {
             game.collected_food = true;
             let segment = Segment {
@@ -599,6 +600,7 @@ impl ComputeReward {
         genomes: Query<&Genome>,
         views: Query<&GenomeView>,
         mut texts: Query<&mut TextValue>,
+        ids: Res<RunnerIds>,
     ) {
         let (_, mut eval) = evaluations.get_mut(trigger.entity()).unwrap();
         let mut reward = rewards.get_mut(trigger.entity()).unwrap();
@@ -606,12 +608,18 @@ impl ComputeReward {
         reward.can_move_towards_food = status.can_move_towards_food;
         reward.moved_towards_food = status.moved_towards_food;
         reward.collected_food = status.collected_food;
+        let view = views.get(trigger.entity()).unwrap();
         eval.num_turns_taken += 1;
         if eval.num_turns_taken >= environment.max_turns {
+            tree.entity(view.finished_signal).insert(Orange::base());
             tree.entity(trigger.entity()).insert(Running(false));
+            runner.finished += 1;
+            tree.entity(ids.num_running).insert(TextValue::new(format!(
+                "Running: {}",
+                runner.population.len() - runner.finished as usize
+            )));
         }
         eval.fitness += reward.value();
-        let view = views.get(trigger.entity()).unwrap();
         texts.get_mut(view.score).unwrap().0 = format!("Score: {}", eval.fitness);
         drop(eval);
         if runner.finished == environment.population_count {

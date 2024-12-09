@@ -5,8 +5,7 @@ edition = "2021"
 
 [profile.test]
 debug = true
-[profile.dev]
-debug = "full"
+
 [dependencies]
 rand = "0.8.5"
 foliage = { git="https://github.com/eblack-leaf/foliage.git" }

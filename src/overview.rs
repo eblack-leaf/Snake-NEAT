@@ -3,8 +3,8 @@ use crate::runner::game::{ComputeReward, GameSpeed, MoveWithNetworkOutput, SetNe
 use crate::runner::genome::{Activate, MaxDepthCheck};
 use crate::runner::species::Speciate;
 use crate::runner::{
-    AddGame, Evaluate, EvaluateGenome, GameSpeedChange, Process, RunnerIn, RunnerOut,
-    StopGeneration, UpdateGenerationText, UpdateSpeciesCountText,
+    AddGame, Evaluate, EvaluateGenome, GameSpeedChange, Process, RunnerIn, RunnerOut
+    , UpdateGenerationText, UpdateSpeciesCountText,
 };
 use crate::section::{CurrentSection, SectionIn, SectionOut, SelectObs, SelectSection};
 use foliage::bevy_ecs::entity::Entity;

@@ -11,8 +11,6 @@ use foliage::bevy_ecs::entity::Entity;
 use foliage::bevy_ecs::prelude::{Event, IntoSystemConfigs, Res, Trigger};
 use foliage::bevy_ecs::system::{Query, ResMut, Resource};
 use foliage::color::{Blue, Grey, Monochromatic, Orange};
-use foliage::coordinate::section::Section;
-use foliage::coordinate::LogicalContext;
 use foliage::elm::{Elm, ExternalStage};
 use foliage::grid::aspect::stem;
 use foliage::grid::responsive::evaluate::{ScrollContext, Scrollable};
