@@ -18,6 +18,7 @@ use foliage::panel::{Panel, Rounding};
 use foliage::text::TextValue;
 use foliage::time::{Time, TimeDelta};
 use foliage::tree::Tree;
+use rand::Rng;
 
 #[derive(Resource, Clone)]
 pub(crate) struct GameSpeed {
@@ -124,10 +125,10 @@ impl Game {
                 .insert(Panel::new(Rounding::default(), Grey::minus_two()))
                 .insert(
                     ResponsiveLocation::new()
-                        .left(location.x.column().begin().of(stem()))
-                        .right(location.x.column().end().of(stem()))
-                        .top(location.y.row().begin().of(stem()))
-                        .bottom(location.y.row().end().of(stem())),
+                        .left((location.x + 1).column().begin().of(stem()))
+                        .right((location.x + 1).column().end().of(stem()))
+                        .top((location.y + 1).row().begin().of(stem()))
+                        .bottom((location.y + 1).row().end().of(stem())),
                 )
                 .insert(EvaluateCore::recursive())
                 .id();
@@ -140,10 +141,10 @@ impl Game {
                 .insert(Panel::new(Rounding::default(), Orange::base()))
                 .insert(
                     ResponsiveLocation::new()
-                        .left(location.x.column().begin().of(stem()))
-                        .right(location.x.column().end().of(stem()))
-                        .top(location.y.row().begin().of(stem()))
-                        .bottom(location.y.row().end().of(stem())),
+                        .left((location.x + 1).column().begin().of(stem()))
+                        .right((location.x + 1).column().end().of(stem()))
+                        .top((location.y + 1).row().begin().of(stem()))
+                        .bottom((location.y + 1).row().end().of(stem())),
                 )
                 // .insert(ScrollContext::new(wrapper))
                 .insert(EvaluateCore::recursive())
@@ -537,18 +538,34 @@ impl MoveWithNetworkOutput {
                     .spawn(Leaf::new().stem(Some(game.canvas)).elevation(-1))
                     // .insert(ScrollContext::new(game.wrapper))
                     .insert(Panel::new(Rounding::default(), Grey::minus_two()))
+                    .insert(EvaluateCore::recursive())
                     .id(),
                 location: game.last_tail_location,
             };
             game.snake.segments.push(segment);
-            game.food.location = Location::new(0, 0);
+            game.food.location = Location::new(
+                rand::thread_rng().gen_range(0..game.grid.grid.0),
+                rand::thread_rng().gen_range(0..game.grid.grid.1),
+            );
+            while game
+                .snake
+                .segments
+                .iter()
+                .find(|s| s.location == game.food.location)
+                .is_some()
+            {
+                game.food.location = Location::new(
+                    rand::thread_rng().gen_range(0..game.grid.grid.0),
+                    rand::thread_rng().gen_range(0..game.grid.grid.1),
+                )
+            }
             tree.entity(game.food.panel)
                 .insert(
                     ResponsiveLocation::new()
-                        .left(game.food.location.x.column().begin().of(stem()))
-                        .right(game.food.location.x.column().end().of(stem()))
-                        .top(game.food.location.y.row().begin().of(stem()))
-                        .bottom(game.food.location.y.row().end().of(stem())),
+                        .left((game.food.location.x + 1).column().begin().of(stem()))
+                        .right((game.food.location.x + 1).column().end().of(stem()))
+                        .top((game.food.location.y + 1).row().begin().of(stem()))
+                        .bottom((game.food.location.y + 1).row().end().of(stem())),
                 )
                 .insert(EvaluateCore::recursive());
         } else {
@@ -559,10 +576,10 @@ impl MoveWithNetworkOutput {
             tree.entity(game.snake.segments.get(i).unwrap().panel)
                 .insert(
                     ResponsiveLocation::new()
-                        .left(seg.x.column().begin().of(stem()))
-                        .right(seg.x.column().end().of(stem()))
-                        .top(seg.y.row().begin().of(stem()))
-                        .bottom(seg.y.row().end().of(stem())),
+                        .left((seg.x + 1).column().begin().of(stem()))
+                        .right((seg.x + 1).column().end().of(stem()))
+                        .top((seg.y + 1).row().begin().of(stem()))
+                        .bottom((seg.y + 1).row().end().of(stem())),
                 )
                 .insert(EvaluateCore::recursive());
         }
