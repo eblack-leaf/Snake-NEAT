@@ -1,4 +1,10 @@
 use crate::intro::{IntroIn, IntroOut};
+use crate::runner::game::{ComputeReward, GameSpeed, MoveWithNetworkOutput, SetNetworkInput};
+use crate::runner::genome::{Activate, MaxDepthCheck};
+use crate::runner::{
+    Evaluate, EvaluateGenome, GameSpeedChange, Process, RunnerIn, RunnerOut, StopGeneration,
+    UpdateGenerationText, UpdateSpeciesCountText,
+};
 use crate::section::{CurrentSection, SectionIn, SectionOut, SelectObs, SelectSection};
 use foliage::bevy_ecs::entity::Entity;
 use foliage::bevy_ecs::system::Resource;
@@ -16,9 +22,6 @@ use foliage::text::{FontSize, Text};
 use foliage::tree::Tree;
 use foliage::twig::{Branch, Twig};
 use foliage::{bevy_ecs, icon_handle};
-use crate::runner::{Evaluate, EvaluateGenome, GameSpeedChange, Process, RunnerIn, RunnerOut, StopGeneration, UpdateGenerationText, UpdateSpeciesCountText};
-use crate::runner::game::{ComputeReward, GameSpeed, MoveWithNetworkOutput, SetNetworkInput};
-use crate::runner::genome::{Activate, MaxDepthCheck};
 
 #[derive(Resource)]
 pub(crate) struct IdTable {

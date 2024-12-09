@@ -1,5 +1,6 @@
 use crate::intro::{IntroIn, IntroOut};
 use crate::overview::{IdTable, SECTION_OUT_END, SELECTOR_DIM, UNSELECTED_OUTLINE_WEIGHT};
+use crate::runner::{RunnerIn, RunnerOut};
 use foliage::anim::Animation;
 use foliage::bevy_ecs;
 use foliage::bevy_ecs::event::Event;
@@ -10,7 +11,6 @@ use foliage::opacity::Opacity;
 use foliage::panel::OutlineWeight;
 use foliage::time::OnEnd;
 use foliage::tree::{EcsExtension, Tree};
-use crate::runner::{RunnerIn, RunnerOut};
 
 #[derive(Event)]
 pub(crate) struct SectionIn {
@@ -66,7 +66,7 @@ impl SectionOut {
                 tree.trigger(IntroOut {});
             }
             7 => {
-                tree.trigger(RunnerOut{});
+                tree.trigger(RunnerOut {});
             }
             _ => {}
         }

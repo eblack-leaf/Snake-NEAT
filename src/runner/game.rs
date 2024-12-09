@@ -1,6 +1,6 @@
 use crate::runner::environment::Environment;
 use crate::runner::genome::{Activate, Evaluation, Genome, NetworkInput, NetworkOutput, Reward};
-use crate::runner::{GenomeView, Process, Runner};
+use crate::runner::{GenomeView, Process, Runner, RunnerIds};
 use foliage::bevy_ecs;
 use foliage::bevy_ecs::component::{ComponentHooks, ComponentId, StorageType};
 use foliage::bevy_ecs::event::Event;
@@ -10,7 +10,6 @@ use foliage::bevy_ecs::system::{Query, Res, ResMut};
 use foliage::bevy_ecs::world::DeferredWorld;
 use foliage::color::{Color, Grey, Monochromatic, Orange};
 use foliage::grid::aspect::stem;
-use foliage::grid::responsive::evaluate::ScrollContext;
 use foliage::grid::responsive::ResponsiveLocation;
 use foliage::grid::unit::TokenUnit;
 use foliage::grid::Grid;
@@ -48,6 +47,11 @@ impl GameSpeed {
         let frames_to_skip = self.frames_to_skip();
         let val = self.delta >= frames_to_skip;
         if val {
+            // println!(
+            //     "delta {} | {}",
+            //     self.delta.as_millis(),
+            //     frames_to_skip.as_millis()
+            // );
             self.delta = TimeDelta::default();
         }
         val
@@ -93,7 +97,7 @@ impl Game {
     ) -> Self {
         let canvas = tree
             .spawn(Leaf::new().stem(Some(g)).elevation(-1))
-            .insert(ScrollContext::new(wrapper))
+            // .insert(ScrollContext::new(wrapper))
             .insert(Panel::new(Rounding::default(), Color::WHITE))
             .insert(
                 ResponsiveLocation::new()
@@ -102,7 +106,7 @@ impl Game {
                     .width(canvas_size.0.px())
                     .height(canvas_size.1.px()),
             )
-            .insert(Grid::new(game_grid.grid.0 as u32, game_grid.grid.1 as u32).gap((2, 2)))
+            .insert(Grid::new(game_grid.grid.0 as u32, game_grid.grid.1 as u32).gap((0, 0)))
             .id();
         let mut snake = Snake {
             segments: vec![],
@@ -115,7 +119,7 @@ impl Game {
             location.y = start.y;
             let panel = tree
                 .spawn(Leaf::new().stem(Some(canvas)).elevation(-1))
-                .insert(ScrollContext::new(wrapper))
+                // .insert(ScrollContext::new(wrapper))
                 .insert(Panel::new(Rounding::default(), Grey::minus_two()))
                 .insert(
                     ResponsiveLocation::new()
@@ -140,7 +144,7 @@ impl Game {
                         .top(location.y.row().begin().of(stem()))
                         .bottom(location.y.row().end().of(stem())),
                 )
-                .insert(ScrollContext::new(wrapper))
+                // .insert(ScrollContext::new(wrapper))
                 .insert(EvaluateCore::recursive())
                 .id(),
             location: Location::default(),
@@ -306,6 +310,7 @@ impl MoveWithNetworkOutput {
         mut games: Query<&mut Game>,
         mut runner: ResMut<Runner>,
         views: Query<&GenomeView>,
+        ids: Res<RunnerIds>,
     ) {
         let mut game = games.get_mut(trigger.entity()).unwrap();
         let view = views.get(trigger.entity()).unwrap();
@@ -499,6 +504,10 @@ impl MoveWithNetworkOutput {
             tree.entity(trigger.entity()).insert(Running(false));
             tree.entity(view.finished_signal).insert(Orange::base());
             runner.finished += 1;
+            tree.entity(ids.num_running).insert(TextValue::new(format!(
+                "Running: {}",
+                runner.population.len() - runner.finished as usize
+            )));
         }
         let mut new_segment_locations = vec![new_head];
         for seg in game.snake.segments.iter_mut() {
@@ -509,7 +518,7 @@ impl MoveWithNetworkOutput {
             let segment = Segment {
                 panel: tree
                     .spawn(Leaf::new().stem(Some(game.canvas)).elevation(-1))
-                    .insert(ScrollContext::new(game.wrapper))
+                    // .insert(ScrollContext::new(game.wrapper))
                     .insert(Panel::new(Rounding::default(), Grey::minus_two()))
                     .id(),
                 location: game.last_tail_location,

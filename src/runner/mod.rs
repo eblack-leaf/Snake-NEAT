@@ -1,10 +1,11 @@
 use crate::overview::{IconHandles, SECTION_OUT_END, SIDE_PANEL_WIDTH, VIEW_AREA};
 use crate::runner::game::{Game, GameGrid, Running};
-use crate::runner::genome::{Activations, Evaluation, MaxDepthCheck, NetworkInput, NetworkOutput, Reward};
+use crate::runner::genome::{
+    Activations, Evaluation, MaxDepthCheck, NetworkInput, NetworkOutput, Reward,
+};
 use crate::runner::species::{Speciate, Species};
 use environment::Environment;
 use foliage::anim::Animation;
-use foliage::{bevy_ecs, Root};
 use foliage::bevy_ecs::component::Component;
 use foliage::bevy_ecs::entity::Entity;
 use foliage::bevy_ecs::prelude::{Event, IntoSystemConfigs, Res, Trigger};
@@ -26,6 +27,7 @@ use foliage::style::Coloring;
 use foliage::text::{FontSize, Text, TextValue};
 use foliage::tree::{EcsExtension, Tree};
 use foliage::twig::button::Button;
+use foliage::{bevy_ecs, Root};
 use game::GameSpeed;
 use genome::Genome;
 use innovation::ExistingInnovation;
@@ -41,7 +43,9 @@ mod node;
 pub(crate) mod species;
 impl Root for Runner {
     fn attach(elm: &mut Elm) {
-        elm.scheduler.main.add_systems(game::run.in_set(ExternalStage::Action));
+        elm.scheduler
+            .main
+            .add_systems(game::run.in_set(ExternalStage::Action));
     }
 }
 #[derive(Event)]
@@ -112,7 +116,7 @@ impl RunnerIn {
             )
             .insert(EvaluateCore::recursive())
             .id();
-        let side = 150;
+        let side = 200;
         let button_size = 32;
         let gen = tree
             .spawn(Leaf::new().stem(Some(root)).elevation(-1))
@@ -161,7 +165,7 @@ impl RunnerIn {
             .insert(
                 Button::new(
                     IconHandles::Check,
-                    Coloring::new(Grey::minus_two(), Grey::plus_two()),
+                    Coloring::new(Grey::plus_two(), Grey::minus_two()),
                 )
                 .circle(),
             )
@@ -180,7 +184,7 @@ impl RunnerIn {
             .insert(
                 Button::new(
                     IconHandles::Check,
-                    Coloring::new(Grey::minus_two(), Grey::plus_two()),
+                    Coloring::new(Grey::plus_two(), Grey::minus_two()),
                 )
                 .circle(),
             )
@@ -196,11 +200,14 @@ impl RunnerIn {
             .id();
         let population_label = tree
             .spawn(Leaf::new().stem(Some(root)).elevation(-1))
-            .insert(Text::new(
-                format!("Population: {}", environment.population_count),
-                FontSize::new(14),
-                Grey::plus_two(),
-            ))
+            .insert(
+                Text::new(
+                    format!("Population: {}", environment.population_count),
+                    FontSize::new(14),
+                    Grey::plus_two(),
+                )
+                .centered(),
+            )
             .insert(
                 ResponsiveLocation::new()
                     .left(stem().left())
@@ -212,11 +219,7 @@ impl RunnerIn {
             .id();
         let species_label = tree
             .spawn(Leaf::new().stem(Some(root)).elevation(-1))
-            .insert(Text::new(
-                "Species: 0",
-                FontSize::new(14),
-                Grey::minus_two(),
-            ))
+            .insert(Text::new("Species: 0", FontSize::new(14), Grey::plus_two()).centered())
             .insert(
                 ResponsiveLocation::new()
                     .left(stem().left())
@@ -228,12 +231,12 @@ impl RunnerIn {
             .id();
         let num_running = tree
             .spawn(Leaf::new().stem(Some(root)).elevation(0))
-            .insert(Text::new("Running: 0", FontSize::new(14), Grey::plus_two()))
+            .insert(Text::new("Running: 0", FontSize::new(14), Grey::plus_two()).centered())
             .insert(
                 ResponsiveLocation::new()
                     .left(stem().left())
                     .width(side.px())
-                    .top((40 + 40 / 3).percent().height().from(stem()))
+                    .top((20 + 40 / 3).percent().height().from(stem()))
                     .height((20 / 3).percent().height().of(stem())),
             )
             .insert(EvaluateCore::recursive())
@@ -249,8 +252,8 @@ impl RunnerIn {
             )
             .insert(
                 ResponsiveLocation::new()
-                    .left(stem().left())
-                    .width(side.px())
+                    .left(stem().left() + 8.px())
+                    .width(side.px() - 16.px())
                     .height(7.percent().height().of(stem()))
                     .top(40.percent().height().from(stem())),
             )
@@ -268,8 +271,8 @@ impl RunnerIn {
             )
             .insert(
                 ResponsiveLocation::new()
-                    .left(stem().left())
-                    .width(side.px())
+                    .left(stem().left() + 8.px())
+                    .width(side.px() - 16.px())
                     .height(7.percent().height().of(stem()))
                     .top(50.percent().height().from(stem())),
             )
@@ -292,7 +295,7 @@ impl RunnerIn {
             .insert(
                 Button::new(
                     IconHandles::Check,
-                    Coloring::new(Grey::minus_two(), Grey::minus_two()),
+                    Coloring::new(Grey::plus_two(), Grey::minus_two()),
                 )
                 .circle(),
             )
@@ -308,7 +311,7 @@ impl RunnerIn {
             .id();
         let game_speed_label = tree
             .spawn(Leaf::new().stem(Some(game_speed)).elevation(0))
-            .insert(Text::new("Speed: 1", FontSize::new(14), Grey::plus_two()))
+            .insert(Text::new("Speed: 1", FontSize::new(14), Grey::plus_two()).centered())
             .insert(
                 ResponsiveLocation::new()
                     .left(stem().left())
@@ -323,7 +326,7 @@ impl RunnerIn {
             .insert(
                 Button::new(
                     IconHandles::Check,
-                    Coloring::new(Grey::minus_two(), Grey::minus_two()),
+                    Coloring::new(Grey::plus_two(), Grey::minus_two()),
                 )
                 .circle(),
             )
@@ -353,9 +356,9 @@ impl RunnerIn {
             canvas_size: (0, 0),
         };
         let main = VIEW_AREA.0 as i32 - SIDE_PANEL_WIDTH as i32 - side;
-        let element_label = 24;
-        let element_size = (300, 150 + element_label);
-        let num_columns = main / element_size.0;
+        let element_label = 20;
+        let element_size = (200, 100 + element_label);
+        let num_columns = main / (element_size.0 + 16);
         let num_rows = (environment.population_count / num_columns).max(1) + 1;
         let view_size = (num_columns * element_size.0, num_rows * element_size.1);
         let canvas_size = (element_size.0, element_size.1 - element_label);
@@ -373,7 +376,7 @@ impl RunnerIn {
             .insert(EvaluateCore::recursive())
             .id();
         let grid = tree
-            .spawn(Leaf::new().stem(Some(root)).elevation(0))
+            .spawn(Leaf::new().stem(Some(grid_wrapper)).elevation(0))
             .insert(Grid::new(num_columns as u32, num_rows as u32).gap((8, 4)))
             .insert(
                 ResponsiveLocation::new()
@@ -389,6 +392,8 @@ impl RunnerIn {
         let mut locations = vec![];
         for c in 0..num_columns {
             for r in 0..num_rows {
+                let c = c + 1;
+                let r = r + 1;
                 locations.push(
                     ResponsiveLocation::new()
                         .left(c.column().begin().of(stem()))
@@ -400,13 +405,13 @@ impl RunnerIn {
         }
         for p in 0..environment.population_count {
             let view = tree
-                .spawn(Leaf::new().stem(Some(grid)))
+                .spawn(Leaf::new().stem(Some(grid)).elevation(-1))
                 .insert(locations.get(p as usize).unwrap().clone())
-                .insert(ScrollContext::new(grid_wrapper))
+                // .insert(ScrollContext::new(grid_wrapper))
                 .insert(EvaluateCore::recursive())
                 .id(); // panel for game-card
             let score_label = tree
-                .spawn(Leaf::new().stem(Some(view)))
+                .spawn(Leaf::new().stem(Some(view)).elevation(-1))
                 .insert(Text::new("Score: 0", FontSize::new(12), Grey::plus_two()))
                 .insert(
                     ResponsiveLocation::new()
@@ -415,16 +420,16 @@ impl RunnerIn {
                         .height(element_label.px())
                         .bottom(stem().bottom()),
                 )
-                .insert(ScrollContext::new(grid_wrapper))
+                // .insert(ScrollContext::new(grid_wrapper))
                 .insert(EvaluateCore::recursive())
                 .id(); // text
             let finished_signal = tree
-                .spawn(Leaf::new().stem(Some(view)))
+                .spawn(Leaf::new().stem(Some(view)).elevation(-1))
                 .insert(Panel::new(Rounding::all(1.0), Orange::base()))
-                .insert(ScrollContext::new(grid_wrapper))
+                // .insert(ScrollContext::new(grid_wrapper))
                 .insert(
                     ResponsiveLocation::new()
-                        .left(116.px())
+                        .left(stem().left() + 116.px())
                         .width((element_label - 4).px())
                         .height((element_label - 4).px())
                         .bottom(stem().bottom() - 4.px()),
@@ -432,7 +437,7 @@ impl RunnerIn {
                 .insert(EvaluateCore::recursive())
                 .id(); // circle-panel color-changing
             let g = tree
-                .spawn(Leaf::new().stem(Some(view)).elevation(0))
+                .spawn(Leaf::new().stem(Some(view)).elevation(-1))
                 .insert(
                     ResponsiveLocation::new()
                         .left(stem().left())
@@ -569,8 +574,7 @@ impl UpdateSpeciesCountText {
         mut text: Query<&mut TextValue>,
         runner: Res<Runner>,
     ) {
-        text.get_mut(ids.species_label).unwrap().0 =
-            format!("Num-Species: {}", runner.species.len());
+        text.get_mut(ids.species_label).unwrap().0 = format!("Species: {}", runner.species.len());
     }
 }
 pub(crate) struct StopGeneration {}
@@ -668,6 +672,10 @@ impl EvaluateGenome {
         tree.entity(view.finished_signal).insert(Blue::base());
         tree.entity(view.score).insert(TextValue::new("Score: 0"));
         runner.finished = (runner.finished - 1).max(0);
+        tree.entity(ids.num_running).insert(TextValue::new(format!(
+            "Running: {}",
+            runner.population.len() - runner.finished as usize
+        )));
     }
 }
 #[derive(Event)]
@@ -835,8 +843,8 @@ impl Process {
                 runner.run_to = false;
             }
         }
-        tree.trigger(UpdateGenerationText{});
-        tree.trigger(UpdateSpeciesCountText{});
+        tree.trigger(UpdateGenerationText {});
+        tree.trigger(UpdateSpeciesCountText {});
         if reevaluate {
             tree.trigger(Evaluate {});
         }
