@@ -1,9 +1,10 @@
 use crate::intro::{IntroIn, IntroOut};
 use crate::runner::game::{ComputeReward, GameSpeed, MoveWithNetworkOutput, SetNetworkInput};
 use crate::runner::genome::{Activate, MaxDepthCheck};
+use crate::runner::species::Speciate;
 use crate::runner::{
-    Evaluate, EvaluateGenome, GameSpeedChange, Process, RunnerIn, RunnerOut, StopGeneration,
-    UpdateGenerationText, UpdateSpeciesCountText,
+    AddGame, Evaluate, EvaluateGenome, GameSpeedChange, Process, RunnerIn, RunnerOut,
+    StopGeneration, UpdateGenerationText, UpdateSpeciesCountText,
 };
 use crate::section::{CurrentSection, SectionIn, SectionOut, SelectObs, SelectSection};
 use foliage::bevy_ecs::entity::Entity;
@@ -222,6 +223,8 @@ impl Branch for Overview {
         tree.observe(ComputeReward::obs);
         tree.observe(MaxDepthCheck::obs);
         tree.observe(Activate::obs);
+        tree.observe(Speciate::obs);
+        tree.observe(AddGame::obs);
         tree.insert_resource(id_table);
         tree.insert_resource(CurrentSection { id: 1 });
         tree.trigger(SelectSection { id: 0 });

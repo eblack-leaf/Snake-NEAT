@@ -74,11 +74,7 @@ pub(crate) struct RunnerIds {
     pub(crate) num_running: Entity,
 }
 impl RunnerIn {
-    pub(crate) fn obs(
-        trigger: Trigger<Self>,
-        mut tree: Tree,
-        sections: Query<&Section<LogicalContext>>,
-    ) {
+    pub(crate) fn obs(trigger: Trigger<Self>, mut tree: Tree) {
         let mut environment = Environment::new();
         environment.population_count = 150;
         environment.input_size = 6;
@@ -503,6 +499,7 @@ impl RunnerIn {
             num_running,
         };
         tree.insert_resource(ids);
+        tree.trigger(Speciate {});
     }
 }
 #[derive(Event)]
@@ -660,14 +657,8 @@ impl EvaluateGenome {
         let genome = trigger.entity();
         let view = views.get(genome).unwrap();
         tree.entity(genome).insert(Evaluation::default());
-        let game = Game::new(
-            &mut tree,
-            ids.grid_wrapper,
-            genome,
-            runner.game_grid,
-            runner.canvas_size,
-        );
-        tree.entity(genome).insert(game);
+        tree.entity(genome).remove::<Game>();
+        tree.trigger_targets(AddGame {}, genome);
         tree.entity(genome).insert(Running(true));
         tree.entity(view.finished_signal).insert(Blue::base());
         tree.entity(view.score).insert(TextValue::new("Score: 0"));
@@ -676,6 +667,26 @@ impl EvaluateGenome {
             "Running: {}",
             runner.population.len() - runner.finished as usize
         )));
+    }
+}
+#[derive(Event)]
+pub(crate) struct AddGame {}
+impl AddGame {
+    pub(crate) fn obs(
+        trigger: Trigger<Self>,
+        mut tree: Tree,
+        mut runner: ResMut<Runner>,
+        ids: Res<RunnerIds>,
+    ) {
+        let genome = trigger.entity();
+        let game = Game::new(
+            &mut tree,
+            ids.grid_wrapper,
+            genome,
+            runner.game_grid,
+            runner.canvas_size,
+        );
+        tree.entity(genome).insert(game);
     }
 }
 #[derive(Event)]

@@ -107,6 +107,7 @@ impl Game {
                     .height(canvas_size.1.px()),
             )
             .insert(Grid::new(game_grid.grid.0 as u32, game_grid.grid.1 as u32).gap((0, 0)))
+            .insert(EvaluateCore::recursive())
             .id();
         let mut snake = Snake {
             segments: vec![],
@@ -244,15 +245,22 @@ impl SetNetworkInput {
                     .segments
                     .iter()
                     .find(|s| s.location == *n)
-                    .is_none()
+                    .is_some()
             })
             .collect::<Vec<_>>();
         game.neighbor_distances = neighbors
             .iter()
             .map(|n| Game::distance(*n, game.food.location))
             .collect::<Vec<_>>();
+        println!("intersect: {:?}", neighbor_intersects_tail);
+        println!("neighbors: {:?}", neighbors);
+        println!("head: {:?}", head);
+        let to_food = Location::new(game.food.location.x - head.x, game.food.location.y - head.y);
         match game.snake.direction {
             Direction::Left => {
+                input.is_food_forward = to_food.x.is_negative();
+                input.is_food_left = to_food.y.is_positive();
+                input.is_food_right = to_food.y.is_negative();
                 if !neighbor_intersects_tail[0] && head.x != 0 {
                     input.can_move_forward = true;
                 }
@@ -264,6 +272,9 @@ impl SetNetworkInput {
                 }
             }
             Direction::Right => {
+                input.is_food_forward = to_food.x.is_positive();
+                input.is_food_left = to_food.y.is_negative();
+                input.is_food_right = to_food.y.is_positive();
                 if !neighbor_intersects_tail[2] && head.x + 1 != game.grid.grid.0 {
                     input.can_move_forward = true;
                 }
@@ -275,6 +286,9 @@ impl SetNetworkInput {
                 }
             }
             Direction::Up => {
+                input.is_food_forward = to_food.y.is_negative();
+                input.is_food_left = to_food.x.is_negative();
+                input.is_food_right = to_food.x.is_positive();
                 if !neighbor_intersects_tail[3] && head.y != 0 {
                     input.can_move_forward = true;
                 }
@@ -286,6 +300,9 @@ impl SetNetworkInput {
                 }
             }
             Direction::Down => {
+                input.is_food_forward = to_food.y.is_positive();
+                input.is_food_left = to_food.x.is_positive();
+                input.is_food_right = to_food.x.is_negative();
                 if !neighbor_intersects_tail[1] && head.y + 1 != game.grid.grid.1 {
                     input.can_move_forward = true;
                 }
