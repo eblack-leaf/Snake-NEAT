@@ -70,6 +70,9 @@ pub(crate) struct RunnerIds {
     pub(crate) expanded_view: Entity,
     pub(crate) gen_stop: Entity,
     pub(crate) num_running: Entity,
+    pub(crate) best_label: Entity,
+    pub(crate) best_print_genome: Entity,
+    pub(crate) best_evaluate: Entity,
 }
 impl RunnerIn {
     pub(crate) fn obs(trigger: Trigger<Self>, mut tree: Tree) {
@@ -90,7 +93,7 @@ impl RunnerIn {
         environment.crossover_only = 0.2;
         environment.connection_weight = 0.8;
         environment.perturb = 0.9;
-        environment.max_turns = 500;
+        environment.max_turns = 5000;
         tree.start_sequence(|seq| {
             seq.animate(
                 Animation::new(Opacity::new(1.0))
@@ -338,7 +341,57 @@ impl RunnerIn {
             .id();
         tree.insert_resource(GameSpeed::new(1));
         let game_grid = GameGrid::new(30, 30);
-        let best_evaluator = tree.spawn(Leaf::new().stem(Some(root)).elevation(-1)).id();
+        let best_evaluator = tree.spawn(Leaf::new().stem(Some(root)).elevation(-1)).id(); // genome
+        let best_label = tree
+            .spawn(Leaf::new().stem(Some(root)).elevation(-1))
+            .insert(Text::new("Best: 0", FontSize::new(16), Grey::plus_two()).centered())
+            .insert(
+                ResponsiveLocation::new()
+                    .left(stem().left())
+                    .width((side - 20).px())
+                    .top(75.percent().height().from(stem()))
+                    .height(32.px()),
+            )
+            .insert(EvaluateCore::recursive())
+            .id();
+        let best_evaluate = tree
+            .spawn(Leaf::new().stem(Some(root)).elevation(-1))
+            .insert(
+                Button::new(
+                    IconHandles::Play,
+                    Coloring::new(Grey::plus_two(), Grey::minus_three()),
+                )
+                .circle(),
+            )
+            .insert(
+                ResponsiveLocation::new()
+                    .left(stem().left() + 32.px())
+                    .width(button_size.px())
+                    .top(75.percent().height().from(stem()) + 36.px())
+                    .height(button_size.px()),
+            )
+            .observe(BestEvaluate::obs)
+            .insert(EvaluateCore::recursive())
+            .id();
+        let best_print_genome = tree
+            .spawn(Leaf::new().stem(Some(root)).elevation(-1))
+            .insert(
+                Button::new(
+                    IconHandles::Git,
+                    Coloring::new(Grey::plus_two(), Grey::minus_three()),
+                )
+                .circle(),
+            )
+            .insert(
+                ResponsiveLocation::new()
+                    .left(stem().left() + 100.px())
+                    .width(button_size.px())
+                    .top(75.percent().height().from(stem()) + 36.px())
+                    .height(button_size.px()),
+            )
+            .observe(BestPrintGenome::obs)
+            .insert(EvaluateCore::recursive())
+            .id();
         let mut runner = Runner {
             population: vec![],
             species: vec![],
@@ -504,6 +557,9 @@ impl RunnerIn {
             expanded_view,
             gen_stop,
             num_running,
+            best_label,
+            best_print_genome,
+            best_evaluate,
         };
         tree.insert_resource(ids);
         tree.trigger(Speciate {});
@@ -771,9 +827,19 @@ impl Process {
         let mut next_gen = vec![];
         let mut remaining = environment.population_count as f32;
         let mut next_gen_id = 0;
-        let best_id = runner.population.iter().max_by(|a, b| {
-            evaluations.get(**a).unwrap().1.fitness.partial_cmp(&evaluations.get(**b).unwrap().1.fitness).unwrap()
-        }).unwrap();
+        let best_id = runner
+            .population
+            .iter()
+            .max_by(|a, b| {
+                evaluations
+                    .get(**a)
+                    .unwrap()
+                    .1
+                    .fitness
+                    .partial_cmp(&evaluations.get(**b).unwrap().1.fitness)
+                    .unwrap()
+            })
+            .unwrap();
         let best_id = genomes.get(*best_id).unwrap().id;
         for species in runner.species.iter_mut() {
             let mut offspring_count =
@@ -896,6 +962,36 @@ impl Process {
         tree.trigger(UpdateSpeciesCountText {});
         if reevaluate {
             tree.trigger(Evaluate {});
+        }
+    }
+}
+pub(crate) struct BestEvaluate {}
+impl BestEvaluate {
+    pub(crate) fn obs(
+        trigger: Trigger<OnClick>,
+        mut tree: Tree,
+        runner: Res<Runner>,
+        ids: Res<RunnerIds>,
+    ) {
+        // TODO for now replacing 0 slot => must be expanded view later
+        let entity = *runner.population.get(0).unwrap();
+        tree.entity(entity)
+            .insert(runner.best.clone().unwrap().0.clone());
+        tree.trigger_targets(EvaluateGenome {}, entity);
+    }
+}
+pub(crate) struct BestPrintGenome {}
+impl BestPrintGenome {
+    pub(crate) fn obs(trigger: Trigger<OnClick>, mut tree: Tree, runner: Res<Runner>) {
+        let best = runner.best.clone().unwrap().0;
+        for n in best.nodes.iter() {
+            println!("Node: {} ty: {:?}", n.id, n.ty);
+        }
+        for c in best.connections.iter() {
+            println!(
+                "Connection: {} from: {} to: {} weight: {} enabled: {}",
+                c.innovation, c.from, c.to, c.weight, c.enabled
+            );
         }
     }
 }

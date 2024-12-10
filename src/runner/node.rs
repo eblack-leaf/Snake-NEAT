@@ -19,7 +19,7 @@ impl Node {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Debug)]
 pub(crate) enum NodeType {
     Input,
     Output,

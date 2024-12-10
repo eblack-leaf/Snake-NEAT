@@ -634,6 +634,8 @@ impl ComputeReward {
                     .best
                     .replace((genomes.get(current_best.0).unwrap().clone(), current_best.1));
                 // TODO update best score label + genome
+                tree.entity(ids.best_label)
+                    .insert(TextValue::new(format!("Best: {}", current_best.1.fitness)));
             }
             if runner.run_to {
                 tree.trigger(Process {});

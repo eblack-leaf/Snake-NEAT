@@ -52,7 +52,11 @@ pub(crate) struct Overview {}
 pub(crate) enum IconHandles {
     Check,
     Table,
-    Left, Right, Stop, Play
+    Left,
+    Right,
+    Stop,
+    Play,
+    Git,
 }
 pub(crate) const NUM_SECTIONS: usize = 8;
 pub(crate) const SELECTOR_DIM: u32 = 32;
@@ -97,6 +101,10 @@ impl Branch for Overview {
         tree.spawn(IconRequest::new(
             IconHandles::Play,
             include_bytes!("assets/play.icon").to_vec(),
+        ));
+        tree.spawn(IconRequest::new(
+            IconHandles::Git,
+            include_bytes!("assets/git-branch.icon").to_vec(),
         ));
         let view_location = ResponsiveLocation::new()
             .left(SIDE_PANEL_WIDTH.px())
@@ -253,4 +261,4 @@ impl Branch for Overview {
     }
 }
 
-pub(crate) const VIEW_AREA: (f32, f32) = (1800.0, 900.0);
+pub(crate) const VIEW_AREA: (f32, f32) = (1750.0, 850.0);
