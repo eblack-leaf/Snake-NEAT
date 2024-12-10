@@ -620,7 +620,7 @@ impl ComputeReward {
         }
         eval.fitness += reward.value();
         tree.entity(view.score)
-            .insert(TextValue::new(format!("Score: {}", eval.fitness)));
+            .insert(TextValue::new(format!("Score: {:.02}", eval.fitness)));
         drop(eval);
         if runner.finished == environment.population_count {
             // give info to best
