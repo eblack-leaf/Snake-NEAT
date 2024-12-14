@@ -258,6 +258,26 @@ impl RunnerIn {
             .observe(EvaluateWrapper::obs)
             .insert(EvaluateCore::recursive())
             .id();
+        let print = tree
+            .spawn(Leaf::new().stem(Some(root)).elevation(-1))
+            .insert(
+                Button::new(
+                    IconHandles::Table,
+                    Coloring::new(Grey::minus_two(), Grey::plus_two()),
+                )
+                    .with_text("Results", FontSize::new(14))
+                    .rounded(Rounding::all(0.2)),
+            )
+            .insert(
+                ResponsiveLocation::new()
+                    .left(stem().left() + 8.px())
+                    .width(side.px() - 16.px())
+                    .height(40.px())
+                    .top(85.percent().height().from(stem())),
+            )
+            .observe(PrintResults::obs)
+            .insert(EvaluateCore::recursive())
+            .id();
         let process = tree
             .spawn(Leaf::new().stem(Some(root)).elevation(-1))
             .insert(
@@ -405,6 +425,9 @@ impl RunnerIn {
             finished: environment.population_count,
             game_grid,
             canvas_size: (0, 0),
+            total: 0.0,
+            averages: vec![],
+            bests: vec![],
         };
         let main = VIEW_AREA.0 as i32 - SIDE_PANEL_WIDTH as i32 - side;
         let element_label = 24;
@@ -599,6 +622,9 @@ pub(crate) struct Runner {
     pub(crate) finished: i32,
     pub(crate) game_grid: GameGrid,
     pub(crate) canvas_size: (i32, i32),
+    pub(crate) total: f32,
+    pub(crate) averages: Vec<f32>,
+    pub(crate) bests: Vec<f32>,
 }
 #[derive(Event)]
 pub(crate) struct GameSpeedChange(pub(crate) i32);
@@ -753,6 +779,13 @@ impl AddGame {
         tree.entity(genome).insert(game);
     }
 }
+pub(crate) struct PrintResults {}
+impl PrintResults {
+    pub(crate) fn obs(trigger: Trigger<OnClick>, mut tree: Tree, runner: Res<Runner>) {
+        std::fs::write("bests.txt", format!("{:?}", runner.bests)).unwrap();
+        std::fs::write("averages.txt", format!("{:?}", runner.averages)).unwrap();
+    }
+}
 #[derive(Event)]
 pub(crate) struct ProcessWrapper {}
 impl ProcessWrapper {
@@ -806,6 +839,7 @@ impl Process {
             }
             runner.species.remove(idx);
         }
+        let mut total = 0.0;
         for species in runner.species.iter_mut() {
             species.shared_fitness = 0.0;
             if species.members.is_empty() {
@@ -814,12 +848,16 @@ impl Process {
             for e in species.members.iter() {
                 let eval = *evaluations.get(*e).unwrap().1;
                 species.shared_fitness += eval.fitness;
+                total += eval.fitness;
             }
             if species.shared_fitness <= 0.0 {
                 continue;
             }
             species.shared_fitness /= species.members.len() as f32;
         }
+        total /= environment.population_count as f32;
+        runner.total = total;
+        runner.averages.push(total);
         let total_fitness = runner.species.iter().map(|s| s.shared_fitness).sum::<f32>();
         for species in runner.species.iter_mut() {
             species.percent_total = species.shared_fitness / total_fitness;

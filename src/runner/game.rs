@@ -629,6 +629,7 @@ impl ComputeReward {
                 .map(|a| (a.0, *a.1))
                 .max_by(|a, b| a.1.fitness.partial_cmp(&b.1.fitness).unwrap())
                 .unwrap();
+            runner.bests.push(current_best.1.fitness);
             if current_best.1.fitness > runner.best.as_ref().unwrap().1.fitness {
                 runner
                     .best
